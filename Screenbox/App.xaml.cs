@@ -84,6 +84,8 @@ sealed partial class App : Application
         }
         catch (Exception ex)
         {
+            CrashLog.Write("CoreApplication.UnhandledErrorDetected", ex);
+
             // Tell Sentry this was an unhandled exception
             ex.Data[Mechanism.HandledKey] = false;
             ex.Data[Mechanism.MechanismKey] = "CoreApplication.UnhandledErrorDetected";
@@ -110,6 +112,7 @@ sealed partial class App : Application
     {
         // Get a reference to the exception, because the Exception property is cleared when accessed.
         var exception = e.Exception;
+        CrashLog.Write("Application.UnhandledException", exception, e.Message);
         if (exception != null)
         {
             // Tell Sentry this was an unhandled exception

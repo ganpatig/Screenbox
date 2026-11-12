@@ -549,4 +549,8 @@
     <value>U</value>
     <comment>{Range="A-Z"}{Limit=1}Access key for entering and exiting fullscreen. Must be unique with respect to every other MenuItem key in this file.</comment>
   </data>
+  <data name="VirtualKeyNumberPadPrefix" xml:space="preserve">
+    <value>Num</value>
+    <comment>Text displayed before the plus or minus sign of a number pad key as part of a keyboard combination, such as "Num +".</comment>
+  </data>
 </root>

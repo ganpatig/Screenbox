@@ -11,6 +11,10 @@ public class TestSettingsService : ISettingsService
     public bool PlayerShowControls { get; set; } = true;
     public bool PersistentShowRemainingTime { get; set; }
     public bool PlayerShowChapters { get; set; } = true;
+    public bool PlayerShowSeekPreview { get; set; } = true;
+    public string PlayerHotkeys { get; set; } = string.Empty;
+    public string PlayerPreferredAudioLanguage { get; set; } = "en";
+    public Windows.Foundation.Size PlayerCompactOverlaySize { get; set; }
     public int PlayerControlsHideDelay { get; set; } = 3;
     public int PersistentVolume { get; set; } = 100;
     public string PersistentSubtitleLanguage { get; set; } = string.Empty;

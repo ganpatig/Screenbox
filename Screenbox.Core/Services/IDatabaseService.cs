@@ -34,6 +34,12 @@ public interface IDatabaseService
     /// <summary>Loads all playback progress entries.</summary>
     Task<List<MediaPlaybackProgress>> LoadPlaybackProgressAsync();
 
+    /// <summary>Replaces the remembered audio and subtitle track choices with the provided snapshot.</summary>
+    Task ReplaceTrackPreferencesAsync(IReadOnlyList<MediaTrackPreference> snapshot);
+
+    /// <summary>Loads the remembered audio and subtitle track choices, most recent first.</summary>
+    Task<List<MediaTrackPreference>> LoadTrackPreferencesAsync();
+
     /// <summary>Persists a playlist and its items.</summary>
     Task SavePlaylistAsync(PlaylistRecordDto playlist);
 

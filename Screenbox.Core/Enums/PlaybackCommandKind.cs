@@ -27,4 +27,15 @@ public enum PlaybackCommandKind
     Scale,
     Subtitle,
     SubtitleOff,
+
+    Loop,
+    Shuffle,
+    AudioTrack,
+    AudioDevice,
+    AudioDelay,
+    SubtitleDelay,
+    SubtitleSync,
+    Crop,
+    Zoom,
+    Deinterlace,
 }

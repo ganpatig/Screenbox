@@ -389,6 +389,17 @@
 
                 <ctc:SettingsCard
                     Margin="{StaticResource SettingsCardMargin}"
+                    Description="{x:Bind strings:Resources.SettingsKeyboardShortcutsDescription}"
+                    Header="{x:Bind strings:Resources.KeyboardShortcuts}"
+                    HeaderIcon="{ui:FontIcon Glyph=&#xE765;}">
+                    <Button
+                        AutomationProperties.HelpText="{x:Bind strings:Resources.SettingsKeyboardShortcutsDescription}"
+                        Click="KeyboardShortcutsButton_OnClick"
+                        Content="{x:Bind strings:Resources.ViewKeyboardShortcuts}" />
+                </ctc:SettingsCard>
+
+                <ctc:SettingsCard
+                    Margin="{StaticResource SettingsCardMargin}"
                     Description="{x:Bind strings:Resources.SettingsVolumeBoostDescription}"
                     Header="{x:Bind strings:Resources.SettingsVolumeBoostHeader}"
                     HeaderIcon="{ui:FontIcon Glyph=&#xE767;,
@@ -453,6 +464,9 @@
                         </ctc:SettingsCard>
                         <ctc:SettingsCard Header="{x:Bind strings:Resources.SettingsShowChaptersHeader}">
                             <ToggleSwitch IsOn="{x:Bind ViewModel.PlayerShowChapters, Mode=TwoWay}" />
+                        </ctc:SettingsCard>
+                        <ctc:SettingsCard Header="{x:Bind strings:Resources.SettingsShowSeekPreviewHeader}">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.PlayerShowSeekPreview, Mode=TwoWay}" />
                         </ctc:SettingsCard>
                         <ctc:SettingsCard Header="{x:Bind strings:Resources.SettingsOnScreenControlsHideDelayHeader}">
                             <ComboBox

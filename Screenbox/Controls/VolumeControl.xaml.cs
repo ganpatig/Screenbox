@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Screenbox.Core.ViewModels;
@@ -79,15 +80,24 @@ public sealed partial class VolumeControl : UserControl
         UpdateIndicatorBoostWidth();
     }
 
+    /// <summary>
+    /// Sizes the part of the slider track that marks the volume above 100%.
+    /// </summary>
+    /// <remarks>
+    /// The indicator shares its grid cell with the slider, so the width given to it is part of the width this
+    /// control asks for. Measuring it from the width the slider was just given therefore feeds layout back into
+    /// itself: with a maximum volume above 100% the two settle a fraction of a pixel apart and keep swapping,
+    /// until XAML abandons the layout pass and the app ends. Whole pixels, and ignoring a width that did not
+    /// really change, keep that from starting.
+    /// </remarks>
     private void UpdateIndicatorBoostWidth()
     {
         int maxVolume = ViewModel.MaxVolume;
-        if (maxVolume < 100)
-        {
-            BoostIndicator.Width = 0;
-            return;
-        }
+        double width = maxVolume < 100
+            ? 0
+            : Math.Round(VolumeSlider.ActualWidth * (maxVolume - 100) / maxVolume);
 
-        BoostIndicator.Width = VolumeSlider.ActualWidth * (maxVolume - 100) / maxVolume;
+        if (BoostIndicator.Width == width) return;
+        BoostIndicator.Width = width;
     }
 }

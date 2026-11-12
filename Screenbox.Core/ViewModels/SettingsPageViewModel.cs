@@ -38,6 +38,7 @@ public sealed partial class SettingsPageViewModel : ObservableRecipient
     [ObservableProperty] public partial bool PlayerGesturePressAndHold { get; set; }
     [ObservableProperty] public partial bool PlayerShowControls { get; set; }
     [ObservableProperty] public partial bool PlayerShowChapters { get; set; }
+    [ObservableProperty] public partial bool PlayerShowSeekPreview { get; set; }
     [ObservableProperty] public partial int PlayerControlsHideDelay { get; set; }
     [ObservableProperty] public partial int VolumeBoost { get; set; }
     [ObservableProperty] public partial bool UseIndexer { get; set; }
@@ -141,6 +142,7 @@ public sealed partial class SettingsPageViewModel : ObservableRecipient
         PlayerGesturePressAndHold = _settingsService.PlayerGesturePressAndHold;
         PlayerShowControls = _settingsService.PlayerShowControls;
         PlayerShowChapters = _settingsService.PlayerShowChapters;
+        PlayerShowSeekPreview = _settingsService.PlayerShowSeekPreview;
         PlayerControlsHideDelay = _settingsService.PlayerControlsHideDelay;
         UseIndexer = _settingsService.UseIndexer;
         ShowRecent = _settingsService.ShowRecent;
@@ -269,6 +271,12 @@ public sealed partial class SettingsPageViewModel : ObservableRecipient
     {
         _settingsService.PlayerShowChapters = value;
         Messenger.Send(new SettingsChangedMessage(nameof(PlayerShowChapters), typeof(SettingsPageViewModel)));
+    }
+
+    partial void OnPlayerShowSeekPreviewChanged(bool value)
+    {
+        _settingsService.PlayerShowSeekPreview = value;
+        Messenger.Send(new SettingsChangedMessage(nameof(PlayerShowSeekPreview), typeof(SettingsPageViewModel)));
     }
 
     partial void OnPlayerControlsHideDelayChanged(int value)

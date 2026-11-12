@@ -14,6 +14,7 @@ using Screenbox.Core.Contexts;
 using Screenbox.Core.Enums;
 using Screenbox.Core.Helpers;
 using Screenbox.Core.Messages;
+using Screenbox.Core.Models;
 using Screenbox.Core.Playback;
 using Screenbox.Core.Services;
 using Windows.Storage;
@@ -60,17 +61,22 @@ public sealed partial class CompositeTrackPickerViewModel : ObservableRecipient,
 
     private readonly IFilesService _filesService;
     private readonly ISettingsService _settingsService;
+    private readonly ITrackPreferenceTracker _trackPreferenceTracker;
     private readonly PlayerContext _playerContext;
     private readonly ILogger<CompositeTrackPickerViewModel> _logger;
     private bool _flyoutOpened;
     private CancellationTokenSource? _cts;
+    private string _currentLocation = string.Empty;
+    private PlaybackItem? _trackedItem;
+    private bool _isApplyingPreferences;
 
     public CompositeTrackPickerViewModel(PlayerContext playerContext, IFilesService filesService,
-        ISettingsService settingsService,
+        ISettingsService settingsService, ITrackPreferenceTracker trackPreferenceTracker,
         ILogger<CompositeTrackPickerViewModel> logger)
     {
         _filesService = filesService;
         _settingsService = settingsService;
+        _trackPreferenceTracker = trackPreferenceTracker;
         _playerContext = playerContext;
         _logger = logger;
         SubtitleTracks = new ObservableCollection<string>();
@@ -80,13 +86,28 @@ public sealed partial class CompositeTrackPickerViewModel : ObservableRecipient,
         Messenger.Register<QueueCurrentItemChangedMessage>(this);
     }
 
+    public async void Receive(QueueCurrentItemChangedMessage message)
+    {
+        try
+        {
+            await PrepareTracksAsync(message);
+        }
+        catch (Exception e)
+        {
+            // An exception from a message handler like this one reaches no caller, so it would end the app.
+            _logger.LogError(e, "Failed to prepare the tracks of the current item.");
+        }
+    }
+
     /// <summary>
     /// Try load a subtitle in the same directory with the same name
     /// </summary>
     [DynamicWindowsRuntimeCast(typeof(StorageFile))]
-    public async void Receive(QueueCurrentItemChangedMessage message)
+    private async Task PrepareTracksAsync(QueueCurrentItemChangedMessage message)
     {
         _cts?.Cancel();
+        StopTrackingChanges();
+        _currentLocation = message.Value?.Location ?? string.Empty;
         if (MediaPlayer is not VlcMediaPlayer player) return;
         if (message.Value is not { Source: StorageFile file, MediaType: MediaPlaybackType.Video } media)
             return;
@@ -106,25 +127,159 @@ public sealed partial class CompositeTrackPickerViewModel : ObservableRecipient,
             }
         }
 
-        if (!subtitleInitialized && media.Item.Value is { } playbackItem)
+        if (media.Item.Value is not { } playbackItem) return;
+
+        // The audio and subtitle tracks of the media only appear once it has been parsed.
+        try
         {
-            try
-            {
-                using var cts = new CancellationTokenSource();
-                _cts = cts;
-                await playbackItem.Media.WaitForParsed(TimeSpan.FromSeconds(5), cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                // pass
-            }
-            finally
-            {
-                _cts = null;
-            }
+            using var cts = new CancellationTokenSource();
+            _cts = cts;
+            await playbackItem.Media.WaitForParsed(TimeSpan.FromSeconds(5), cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // pass
+        }
+        finally
+        {
+            _cts = null;
         }
 
-        TrySetSubtitleFromLanguage(playbackSubtitleTrackList, _settingsService.PersistentSubtitleLanguage);
+        await ApplyTrackPreferencesAsync(media, playbackItem);
+    }
+
+    /// <summary>
+    /// Selects the audio and subtitle tracks that the media item was last played with.
+    /// </summary>
+    /// <remarks>
+    /// An item that was never played with a track of the user's choosing starts with a track in the preferred
+    /// audio language, and with the subtitle language that subtitles were last enabled in.
+    /// </remarks>
+    /// <param name="media">The media item that started playing.</param>
+    /// <param name="item">The playback item of the media.</param>
+    private async Task ApplyTrackPreferencesAsync(MediaViewModel media, PlaybackItem item)
+    {
+        string location = media.Location;
+        await _trackPreferenceTracker.EnsureLoadedAsync();
+
+        // Another item can start playing while the media is parsed or the choices are loaded.
+        if (_currentLocation != location) return;
+
+        // Selecting a track goes straight to the player, so it must be the item the player has opened.
+        if (MediaPlayer is null || !ReferenceEquals(MediaPlayer.PlaybackItem, item)) return;
+
+        MediaTrackPreference? preference = _trackPreferenceTracker.Get(location);
+        _isApplyingPreferences = true;
+        try
+        {
+            ApplyAudioPreference(item.AudioTracks, preference?.Audio);
+            ApplySubtitlePreference(item.SubtitleTracks, preference?.Subtitle);
+        }
+        catch (Exception e)
+        {
+            // Playing with the tracks the player chose is better than not playing at all.
+            _logger.LogError(e, "Failed to select the remembered tracks of '{Location}'.", location);
+        }
+        finally
+        {
+            _isApplyingPreferences = false;
+        }
+
+        StartTrackingChanges(item);
+    }
+
+    private void ApplyAudioPreference(PlaybackAudioTrackList tracks, MediaTrackChoice? choice)
+    {
+        if (tracks.Count == 0) return;
+
+        int index = TrackPreferenceHelper.FindTrack(tracks, choice);
+        if (index < 0 && choice is null)
+        {
+            index = TrackPreferenceHelper.FindPreferredLanguage(tracks, _settingsService.PlayerPreferredAudioLanguage);
+        }
+
+        if (index < 0) return;
+
+        if (tracks.SelectedIndex != index)
+        {
+            tracks.SelectedIndex = index;
+            return;
+        }
+
+        // The track list starts on the first track, while the player may have opened the media with another one.
+        // Changing nothing in the list would leave that track playing, so the player is told directly.
+        if (MediaPlayer is VlcMediaPlayer player && player.VlcPlayer.AudioTrack != tracks[index].VlcTrackId)
+        {
+            player.VlcPlayer.SetAudioTrack(tracks[index].VlcTrackId);
+        }
+    }
+
+    private void ApplySubtitlePreference(PlaybackSubtitleTrackList tracks, MediaTrackChoice? choice)
+    {
+        if (choice is null)
+        {
+            TrySetSubtitleFromLanguage(tracks, _settingsService.PersistentSubtitleLanguage);
+            return;
+        }
+
+        if (choice.IsDisabled)
+        {
+            tracks.SelectedIndex = -1;
+            return;
+        }
+
+        int index = TrackPreferenceHelper.FindTrack(tracks, choice);
+        if (index >= 0)
+        {
+            tracks.SelectedIndex = index;
+        }
+    }
+
+    /// <summary>
+    /// Remembers the tracks of the playing item whenever they change, however they were changed.
+    /// </summary>
+    private void StartTrackingChanges(PlaybackItem item)
+    {
+        _trackedItem = item;
+        item.AudioTracks.SelectedIndexChanged += OnAudioTrackSelectionChanged;
+        item.SubtitleTracks.SelectedIndexChanged += OnSubtitleTrackSelectionChanged;
+    }
+
+    private void StopTrackingChanges()
+    {
+        if (_trackedItem is null) return;
+        _trackedItem.AudioTracks.SelectedIndexChanged -= OnAudioTrackSelectionChanged;
+        _trackedItem.SubtitleTracks.SelectedIndexChanged -= OnSubtitleTrackSelectionChanged;
+        _trackedItem = null;
+    }
+
+    private void OnAudioTrackSelectionChanged(Windows.Media.Core.ISingleSelectMediaTrackList sender, object? args)
+    {
+        if (_isApplyingPreferences || _trackedItem is null || _currentLocation.Length == 0) return;
+        try
+        {
+            _trackPreferenceTracker.UpdateAudio(_currentLocation,
+                TrackPreferenceHelper.CreateChoice(_trackedItem.AudioTracks, sender.SelectedIndex));
+        }
+        catch (Exception e)
+        {
+            // The player raises this while it opens media, so a failure here must not reach it.
+            _logger.LogError(e, "Failed to remember the audio track of '{Location}'.", _currentLocation);
+        }
+    }
+
+    private void OnSubtitleTrackSelectionChanged(Windows.Media.Core.ISingleSelectMediaTrackList sender, object? args)
+    {
+        if (_isApplyingPreferences || _trackedItem is null || _currentLocation.Length == 0) return;
+        try
+        {
+            _trackPreferenceTracker.UpdateSubtitle(_currentLocation,
+                TrackPreferenceHelper.CreateChoice(_trackedItem.SubtitleTracks, sender.SelectedIndex));
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to remember the subtitle track of '{Location}'.", _currentLocation);
+        }
     }
 
     private static void TrySetSubtitleFromLanguage(PlaybackSubtitleTrackList subtitleTrackList, string persistentLanguage)

@@ -1,4 +1,5 @@
 ﻿using System;
+using Screenbox.Core.Models;
 using Windows.System;
 using Windows.UI.Core;
 using Windows.UI.Xaml.Input;
@@ -51,13 +52,34 @@ public static class KeyboardAcceleratorHelper
     /// Gets a value that indicates whether the Control key is currently pressed down.
     /// </summary>
     /// <value><see langword="true"/> if the control key is pressed down; otherwise, <see langword="false"/>.</value>
-    public static bool IsControlKeyDown => GetKeyState(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
+    public static bool IsControlKeyDown => IsKeyDown(VirtualKey.Control);
 
     /// <summary>
     /// Gets a value that indicates whether the Shift key is currently pressed down.
     /// </summary>
     /// <value><see langword="true"/> if the shift key is pressed down; otherwise, <see langword="false"/>.</value>
-    public static bool IsShiftKeyDown => GetKeyState(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
+    public static bool IsShiftKeyDown => IsKeyDown(VirtualKey.Shift);
+
+    /// <summary>
+    /// Gets a value that indicates whether either Windows key is currently pressed down.
+    /// </summary>
+    /// <value><see langword="true"/> if a Windows key is pressed down; otherwise, <see langword="false"/>.</value>
+    public static bool IsWindowsKeyDown => IsKeyDown(VirtualKey.LeftWindows) || IsKeyDown(VirtualKey.RightWindows);
+
+    /// <summary>
+    /// Gets the modifier keys that are held down during a key event of the window.
+    /// </summary>
+    /// <param name="keyStatus">The status of the key that the event belongs to.</param>
+    /// <returns>A combination of <see cref="VirtualKeyModifiers.Control"/>, <see cref="VirtualKeyModifiers.Menu"/>
+    /// and <see cref="VirtualKeyModifiers.Shift"/>.</returns>
+    public static VirtualKeyModifiers GetModifiers(CorePhysicalKeyStatus keyStatus)
+    {
+        VirtualKeyModifiers modifiers = VirtualKeyModifiers.None;
+        if (IsControlKeyDown) modifiers |= VirtualKeyModifiers.Control;
+        if (IsShiftKeyDown) modifiers |= VirtualKeyModifiers.Shift;
+        if (keyStatus.IsMenuKeyDown) modifiers |= VirtualKeyModifiers.Menu;
+        return modifiers;
+    }
 
     /// <summary>
     /// Converts the value of the specified <see cref="KeyboardAccelerator"/> to its equivalent
@@ -73,9 +95,37 @@ public static class KeyboardAcceleratorHelper
             return string.Empty;
         }
 
-        string keyText = value.Key.ToDisplayName();
+        return ToDisplayName(value.Key, value.Modifiers);
+    }
+
+    /// <summary>
+    /// Converts a keyboard shortcut to its equivalent <see cref="string"/> representation.
+    /// </summary>
+    /// <param name="binding">The key combination of the shortcut.</param>
+    /// <returns>The localized string representation of the key combination, such as "Ctrl+Shift+K".</returns>
+    public static string ToDisplayName(this HotkeyBinding binding)
+    {
+        // The number pad plus and minus keys look the same as the main keys without a prefix.
+        string keyText = binding.Key switch
+        {
+            VirtualKey.Add => $"{Strings.KeyboardResources.VirtualKeyNumberPadPrefix} +",
+            VirtualKey.Subtract => $"{Strings.KeyboardResources.VirtualKeyNumberPadPrefix} -",
+            _ => string.Empty,
+        };
+
+        return keyText.Length > 0
+            ? FormatDisplayName(keyText, binding.Modifiers)
+            : ToDisplayName(binding.Key, binding.Modifiers);
+    }
+
+    private static string ToDisplayName(VirtualKey key, VirtualKeyModifiers modifiers)
+    {
+        return FormatDisplayName(key.ToDisplayName(), modifiers);
+    }
+
+    private static string FormatDisplayName(string keyText, VirtualKeyModifiers modifiers)
+    {
         string separator = Strings.KeyboardResources.KeyboardAcceleratorValueSeparator;
-        var modifiers = value.Modifiers;
 
         string[] parts = new string[5];
         int count = 0;
@@ -188,6 +238,18 @@ public static class KeyboardAcceleratorHelper
             VirtualKey.Subtract => "-",
             VirtualKey.Decimal => ".",
             VirtualKey.Divide => "/",
+            // The punctuation keys, named after the characters they type on the US keyboard layout.
+            (VirtualKey)0xBA => ";",
+            (VirtualKey)0xBB => "=",
+            (VirtualKey)0xBC => ",",
+            (VirtualKey)0xBD => "-",
+            (VirtualKey)0xBE => ".",
+            (VirtualKey)0xBF => "/",
+            (VirtualKey)0xC0 => "`",
+            (VirtualKey)0xDB => "[",
+            (VirtualKey)0xDC => "\\",
+            (VirtualKey)0xDD => "]",
+            (VirtualKey)0xDE => "'",
             VirtualKey.NumberKeyLock => Strings.KeyboardResources.VirtualKeyNumberKeyLock,
             VirtualKey.Scroll => Strings.KeyboardResources.VirtualKeyScroll,
             VirtualKey.LeftShift => Strings.KeyboardResources.VirtualKeyModifiersShift,
@@ -218,9 +280,18 @@ public static class KeyboardAcceleratorHelper
         };
     }
 
-    private static CoreVirtualKeyStates GetKeyState(VirtualKey key)
+    private static bool IsKeyDown(VirtualKey key)
     {
-        var window = CoreWindow.GetForCurrentThread();
-        return window is null ? CoreVirtualKeyStates.None : window.GetKeyState(key);
+        CoreWindow? window = CoreWindow.GetForCurrentThread();
+        if (window is null)
+        {
+            return false;
+        }
+
+        // The key state that belongs to the current key event might not be up to date yet while the window's
+        // AcceleratorKeyActivated event is raised. The physical state of the key is checked as well, because
+        // a modifier key is still held down when the other key of the combination is pressed.
+        return window.GetKeyState(key).HasFlag(CoreVirtualKeyStates.Down) ||
+               window.GetAsyncKeyState(key).HasFlag(CoreVirtualKeyStates.Down);
     }
 }

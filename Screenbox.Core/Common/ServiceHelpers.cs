@@ -42,6 +42,8 @@ public static class ServiceHelpers
         services.AddTransient<PlaylistViewModel>();
         services.AddTransient<PlaylistsPageViewModel>();
         services.AddTransient<SelectionViewModel>();
+        services.AddTransient<OnlineSubtitleSearchViewModel>();
+        services.AddTransient<KeyboardShortcutsViewModel>();
         services.AddSingleton<CommonViewModel>();   // Shared between many pages
         services.AddSingleton<VolumeViewModel>();   // Avoid thread lock
 
@@ -61,11 +63,14 @@ public static class ServiceHelpers
         services.AddSingleton<LibraryContext>();
         services.AddSingleton<PlayQueueContext>();
         services.AddSingleton<WindowContext>();
+        services.AddSingleton<HotkeyContext>();
 
         // Coordinators
         services.AddSingleton<ILibraryCoordinator, LibraryCoordinator>();
         services.AddSingleton<IPlayQueueCoordinator, PlayQueueCoordinator>();
         services.AddSingleton<IPlaybackProgressTracker, PlaybackProgressTracker>();
+        services.AddSingleton<ITrackPreferenceTracker, TrackPreferenceTracker>();
+        services.AddSingleton<ISeekPreviewCoordinator, SeekPreviewCoordinator>();
 
         // Services
         services.AddSingleton<IDatabaseService, DatabaseService>();
@@ -79,5 +84,6 @@ public static class ServiceHelpers
         services.AddSingleton<ISystemMediaTransportControlsService, SystemMediaTransportControlsService>();
         services.AddSingleton<IPlaybackControlService, PlaybackControlService>();
         services.AddSingleton<IPlaylistService, PlaylistService>();
+        services.AddSingleton<IOnlineSubtitleService, OpenSubtitlesService>();
     }
 }

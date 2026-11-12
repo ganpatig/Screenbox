@@ -140,32 +140,59 @@
                 </Grid>
             </ListView.Header>
             <ListView.Footer>
-                <!--  Imitate the look of ListViewItem  -->
-                <Button
-                    MinHeight="36"
-                    Margin="{StaticResource MenuFlyoutItemMargin}"
-                    Padding="12,4"
-                    HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Left"
-                    Command="{x:Bind ViewModel.AddSubtitleCommand}"
-                    Content="{x:Bind strings:Resources.AddSubtitle}"
-                    Style="{StaticResource SubtleButtonStyle}">
-                    <Button.Resources>
-                        <ResourceDictionary>
-                            <ResourceDictionary.ThemeDictionaries>
-                                <ResourceDictionary x:Key="Default">
-                                    <SolidColorBrush x:Key="SubtleButtonForegroundPressed" Color="{ThemeResource TextFillColorPrimary}" />
-                                </ResourceDictionary>
-                                <ResourceDictionary x:Key="Light">
-                                    <SolidColorBrush x:Key="SubtleButtonForegroundPressed" Color="{ThemeResource TextFillColorPrimary}" />
-                                </ResourceDictionary>
-                                <ResourceDictionary x:Key="HighContrast">
-                                    <SolidColorBrush x:Key="SubtleButtonForegroundPressed" Color="{ThemeResource SystemColorHighlightTextColor}" />
-                                </ResourceDictionary>
-                            </ResourceDictionary.ThemeDictionaries>
-                        </ResourceDictionary>
-                    </Button.Resources>
-                </Button>
+                <StackPanel>
+                    <!--  Imitate the look of ListViewItem  -->
+                    <Button
+                        MinHeight="36"
+                        Margin="{StaticResource MenuFlyoutItemMargin}"
+                        Padding="12,4"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Command="{x:Bind ViewModel.AddSubtitleCommand}"
+                        Content="{x:Bind strings:Resources.AddSubtitle}"
+                        Style="{StaticResource SubtleButtonStyle}">
+                        <Button.Resources>
+                            <ResourceDictionary>
+                                <ResourceDictionary.ThemeDictionaries>
+                                    <ResourceDictionary x:Key="Default">
+                                        <SolidColorBrush x:Key="SubtleButtonForegroundPressed" Color="{ThemeResource TextFillColorPrimary}" />
+                                    </ResourceDictionary>
+                                    <ResourceDictionary x:Key="Light">
+                                        <SolidColorBrush x:Key="SubtleButtonForegroundPressed" Color="{ThemeResource TextFillColorPrimary}" />
+                                    </ResourceDictionary>
+                                    <ResourceDictionary x:Key="HighContrast">
+                                        <SolidColorBrush x:Key="SubtleButtonForegroundPressed" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                                    </ResourceDictionary>
+                                </ResourceDictionary.ThemeDictionaries>
+                            </ResourceDictionary>
+                        </Button.Resources>
+                    </Button>
+                    <Button
+                        MinHeight="36"
+                        Margin="{StaticResource MenuFlyoutItemMargin}"
+                        Padding="12,4"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Command="{x:Bind SearchOnlineSubtitlesCommand}"
+                        Content="{x:Bind strings:Resources.AddSubtitleFromOnline}"
+                        Style="{StaticResource SubtleButtonStyle}">
+                        <Button.Resources>
+                            <ResourceDictionary>
+                                <ResourceDictionary.ThemeDictionaries>
+                                    <ResourceDictionary x:Key="Default">
+                                        <SolidColorBrush x:Key="SubtleButtonForegroundPressed" Color="{ThemeResource TextFillColorPrimary}" />
+                                    </ResourceDictionary>
+                                    <ResourceDictionary x:Key="Light">
+                                        <SolidColorBrush x:Key="SubtleButtonForegroundPressed" Color="{ThemeResource TextFillColorPrimary}" />
+                                    </ResourceDictionary>
+                                    <ResourceDictionary x:Key="HighContrast">
+                                        <SolidColorBrush x:Key="SubtleButtonForegroundPressed" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                                    </ResourceDictionary>
+                                </ResourceDictionary.ThemeDictionaries>
+                            </ResourceDictionary>
+                        </Button.Resources>
+                    </Button>
+                </StackPanel>
             </ListView.Footer>
             <d:ListView.Items>
                 <ListViewItem Content="{x:Bind strings:Resources.Disable}" />

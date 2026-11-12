@@ -17,6 +17,12 @@ public sealed partial class CompositeTrackPicker : UserControl
     public IRelayCommand? ShowAudioOptionsCommand { get; set; }
 
     /// <summary>
+    /// Gets or sets the command that opens the online subtitle search. The host provides it, so that it can close
+    /// the flyout that contains this control first.
+    /// </summary>
+    public IRelayCommand? SearchOnlineSubtitlesCommand { get; set; }
+
+    /// <summary>
     /// View-level subtitle track list that prepends a localized "Disable" entry to
     /// <see cref="CompositeTrackPickerViewModel.SubtitleTracks"/> and applies "Track N"
     /// fallback labels for unlabeled tracks. The subtitle ListView binds to this list.

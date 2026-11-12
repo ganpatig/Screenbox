@@ -54,4 +54,9 @@ public sealed partial class SettingsPage : Page
     {
         await Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:search"));
     }
+
+    private async void KeyboardShortcutsButton_OnClick(object sender, Windows.UI.Xaml.RoutedEventArgs e)
+    {
+        await Dialogs.KeyboardShortcutsDialog.ShowShortcutsAsync();
+    }
 }

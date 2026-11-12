@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Screenbox.Core.Enums;
 using Screenbox.Core.Helpers;
+using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.Media;
 using Windows.Storage;
@@ -35,7 +36,13 @@ public sealed class SettingsService : ISettingsService
     private const string PersistentSongsSortOrderKey = "Values/Songs/SortOrder";
     private const string PersistentAlbumsSortOrderKey = "Values/Albums/SortOrder";
     private const string PlayerShowChaptersKey = "Player/ShowChapters";
+    private const string PlayerShowSeekPreviewKey = "Player/ShowSeekPreview";
     private const string PrivacyPersistPlaybackPosition = "Privacy/PersistPlaybackPosition";
+    private const string VlcDefaultsVersionKey = "Values/VlcDefaultsVersion";
+    private const string PlayerHotkeysKey = "Player/Hotkeys";
+    private const string PlayerPreferredAudioLanguageKey = "Player/PreferredAudioLanguage";
+    private const string PlayerCompactOverlayWidthKey = "Player/CompactOverlayWidth";
+    private const string PlayerCompactOverlayHeightKey = "Player/CompactOverlayHeight";
 
     private const string PlayerRewindStepKey = "Player/RewindStep";
     private const string PlayerFastForwardStepKey = "Player/FastForwardStep";
@@ -76,6 +83,22 @@ public sealed class SettingsService : ISettingsService
     {
         get => GetValue<string>(PersistentSubtitleLanguageKey) ?? string.Empty;
         set => SetValue(PersistentSubtitleLanguageKey, value);
+    }
+
+    public string PlayerPreferredAudioLanguage
+    {
+        get => GetValue<string>(PlayerPreferredAudioLanguageKey) ?? string.Empty;
+        set => SetValue(PlayerPreferredAudioLanguageKey, value);
+    }
+
+    public Size PlayerCompactOverlaySize
+    {
+        get => new(GetValue<int>(PlayerCompactOverlayWidthKey), GetValue<int>(PlayerCompactOverlayHeightKey));
+        set
+        {
+            SetValue(PlayerCompactOverlayWidthKey, (int)Math.Round(value.Width));
+            SetValue(PlayerCompactOverlayHeightKey, (int)Math.Round(value.Height));
+        }
     }
 
     public int MaxVolume
@@ -174,6 +197,18 @@ public sealed class SettingsService : ISettingsService
         set => SetValue(PlayerShowChaptersKey, value);
     }
 
+    public bool PlayerShowSeekPreview
+    {
+        get => GetValue<bool>(PlayerShowSeekPreviewKey);
+        set => SetValue(PlayerShowSeekPreviewKey, value);
+    }
+
+    public string PlayerHotkeys
+    {
+        get => GetValue<string>(PlayerHotkeysKey) ?? string.Empty;
+        set => SetValue(PlayerHotkeysKey, value);
+    }
+
     public bool PersistPlaybackPosition
     {
         get => GetValue<bool>(PrivacyPersistPlaybackPosition);
@@ -258,7 +293,8 @@ public sealed class SettingsService : ISettingsService
         SetDefault(PlayerShowControlsKey, true);
         SetDefault(PlayerControlsHideDelayKey, 3);
         SetDefault(PersistentVolumeKey, 100);
-        SetDefault(MaxVolumeKey, 100);
+        // Like VLC, the volume can be raised to 200%.
+        SetDefault(MaxVolumeKey, 200);
         SetDefault(LibrariesUseIndexerKey, true);
         SetDefault(LibrariesSearchRemovableStorageKey, true);
         SetDefault(GeneralFrameCaptureFolderTokenKey, string.Empty);
@@ -272,9 +308,13 @@ public sealed class SettingsService : ISettingsService
         SetDefault(PersistentSongsSortOrderKey, (int)SongSortOrder.Title);
         SetDefault(PersistentAlbumsSortOrderKey, (int)AlbumSortOrder.Title);
         SetDefault(PlayerShowChaptersKey, true);
+        SetDefault(PlayerShowSeekPreviewKey, true);
         SetDefault(PrivacyPersistPlaybackPosition, true);
-        SetDefault(PlayerRewindStepKey, 5);
-        SetDefault(PlayerFastForwardStepKey, 5);
+        // Media with tracks in several languages starts in English, unless another track was played before.
+        SetDefault(PlayerPreferredAudioLanguageKey, "en");
+        // The rewind and fast forward steps are the short jump of the VLC keyboard shortcuts, which is 10 seconds in VLC.
+        SetDefault(PlayerRewindStepKey, 10);
+        SetDefault(PlayerFastForwardStepKey, 10);
         SetDefault(PlayerGestureTapKey, (int)PlaybackActionKind.PlayPause);
         SetDefault(PlayerGestureSwipeUpKey, (int)PlaybackActionKind.IncreaseVolume);
         SetDefault(PlayerGestureSwipeDownKey, (int)PlaybackActionKind.DecreaseVolume);
@@ -283,6 +323,7 @@ public sealed class SettingsService : ISettingsService
         SetDefault(PlayerGestureSlideVerticalKey, true);
         SetDefault(PlayerGestureSlideHorizontalKey, true);
         SetDefault(PlayerGesturePressAndHoldKey, true);
+        ApplyVlcDefaults();
 
         // Device family specific overrides
         if (SystemInformation.IsXbox)
@@ -297,6 +338,37 @@ public sealed class SettingsService : ISettingsService
             SetValue(PlayerGestureSlideHorizontalKey, false);
             SetValue(PlayerGesturePressAndHoldKey, false);
         }
+    }
+
+    /// <summary>
+    /// Changes settings that still have the original Screenbox defaults to the VLC defaults, once.
+    /// </summary>
+    /// <remarks>
+    /// New defaults only apply to settings that were never stored. Installations that were set up before
+    /// the VLC keyboard shortcuts already stored the old defaults, so those values are updated here.
+    /// Values that the user changed are kept.
+    /// </remarks>
+    private static void ApplyVlcDefaults()
+    {
+        const int CurrentVersion = 1;
+        if (GetValue<int>(VlcDefaultsVersionKey) >= CurrentVersion) return;
+
+        if (GetValue<int>(MaxVolumeKey) == 100)
+        {
+            SetValue(MaxVolumeKey, 200);
+        }
+
+        if (GetValue<int>(PlayerRewindStepKey) == 5)
+        {
+            SetValue(PlayerRewindStepKey, 10);
+        }
+
+        if (GetValue<int>(PlayerFastForwardStepKey) == 5)
+        {
+            SetValue(PlayerFastForwardStepKey, 10);
+        }
+
+        SetValue(VlcDefaultsVersionKey, CurrentVersion);
     }
 
     private static T? GetValue<T>(string key)

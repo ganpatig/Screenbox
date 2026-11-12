@@ -110,7 +110,7 @@ public sealed partial class ChapterProgressBar : UserControl
         if (view.ProgressItems.Count == 1)
         {
             if (view.ProgressItems[0].Width == 0)
-                view.ProgressItems[0].Width = view.ActualWidth;
+                SetItemWidth(view.ProgressItems[0], view.ActualWidth);
 
             view.ProgressItems[0].Maximum = (double)e.NewValue;
         }
@@ -118,16 +118,39 @@ public sealed partial class ChapterProgressBar : UserControl
 
     private void OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
+        UpdateItemWidths();
+    }
+
+    /// <summary>
+    /// Gives each chapter of the bar its width.
+    /// </summary>
+    /// <remarks>
+    /// The chapters are laid out in a horizontal stack panel inside this control, so the widths given to them
+    /// decide the width this control asks for, while they are measured from the width it was given. Rounding
+    /// them, and leaving an unchanged width alone, keeps the two from chasing each other from one layout pass
+    /// to the next, which XAML ends the app over.
+    /// </remarks>
+    private void UpdateItemWidths()
+    {
         if (ProgressItems.Count == 1)
         {
-            ProgressItems[0].Width = ActualWidth;
+            SetItemWidth(ProgressItems[0], ActualWidth);
         }
         else
         {
             foreach (ChapterViewModel item in ProgressItems)
             {
-                item.Width = GetItemWidth(item.Maximum - item.Minimum, ProgressItems.Count);
+                SetItemWidth(item, GetItemWidth(item.Maximum - item.Minimum, ProgressItems.Count));
             }
+        }
+    }
+
+    private static void SetItemWidth(ChapterViewModel item, double width)
+    {
+        width = double.IsNaN(width) ? 0 : Math.Max(0, Math.Floor(width));
+        if (item.Width != width)
+        {
+            item.Width = width;
         }
     }
 
@@ -252,19 +275,14 @@ public sealed partial class ChapterProgressBar : UserControl
             }
 
             // Update the width of each chapter
-            foreach (ChapterViewModel item in ProgressItems)
-            {
-                item.Width = GetItemWidth(item.Maximum - item.Minimum, ProgressItems.Count);
-            }
+            UpdateItemWidths();
         }
         else
         {
             ChapterIndex = 0;
-            ProgressItems.Add(new ChapterViewModel
-            {
-                Maximum = Maximum,
-                Width = ActualWidth
-            });
+            ChapterViewModel wholeMedia = new() { Maximum = Maximum };
+            SetItemWidth(wholeMedia, ActualWidth);
+            ProgressItems.Add(wholeMedia);
         }
     }
 

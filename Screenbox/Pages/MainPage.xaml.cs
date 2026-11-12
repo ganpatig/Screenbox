@@ -164,16 +164,44 @@ public sealed partial class MainPage : Page, IContentFrame
 
     private void CoreDispatcher_AcceleratorKeyActivated(CoreDispatcher sender, AcceleratorKeyEventArgs args)
     {
+        // The keyboard shortcut editor is recording keys, which are not shortcuts until it assigns them.
+        if (Dialogs.KeyboardShortcutsDialog.IsRecordingKeys)
+        {
+            return;
+        }
+
+        // The player shortcuts come first, so that Alt+Left jumps back in the video instead of leaving the player.
+        if (!args.Handled && PlayerFrame.Content is PlayerPage playerPage && playerPage.TryHandleKeyboardShortcut(args))
+        {
+            args.Handled = true;
+            return;
+        }
+
         if (args is
             {
                 EventType: CoreAcceleratorKeyEventType.SystemKeyDown,
                 VirtualKey: VirtualKey.Left,
                 KeyStatus.IsMenuKeyDown: true,
                 Handled: false
-            })
+            } && !IsContentDialogOpen())
         {
             args.Handled = TryGoBack();
         }
+    }
+
+    [DynamicWindowsRuntimeCast(typeof(ContentDialog))]
+    private static bool IsContentDialogOpen()
+    {
+        // A dialog keeps the page behind it from navigating, and the keyboard shortcut editor records Alt+Left as a key.
+        foreach (Windows.UI.Xaml.Controls.Primitives.Popup popup in Windows.UI.Xaml.Media.VisualTreeHelper.GetOpenPopups(Window.Current))
+        {
+            if (popup.Child is ContentDialog)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void System_BackRequested(object? sender, BackRequestedEventArgs e)

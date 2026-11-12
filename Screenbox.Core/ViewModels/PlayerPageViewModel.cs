@@ -29,6 +29,7 @@ namespace Screenbox.Core.ViewModels;
 
 public sealed partial class PlayerPageViewModel : ObservableRecipient,
     IRecipient<TogglePlayerVisibilityMessage>,
+    IRecipient<ShowSettingsPageMessage>,
     IRecipient<PlayerOsdUpdateMessage>,
     IRecipient<PropertyChangedMessage<IMediaPlayer?>>,
     IRecipient<QueueCurrentItemChangedMessage>,
@@ -38,11 +39,6 @@ public sealed partial class PlayerPageViewModel : ObservableRecipient,
     IRecipient<PropertyChangedMessage<NavigationViewDisplayMode>>,
     IRecipient<PropertyChangedMessage<WindowViewMode>>
 {
-    private const VirtualKey VK_OEM_PLUS = (VirtualKey)0xBB;
-    private const VirtualKey VK_OEM_COMMA = (VirtualKey)0xBC;
-    private const VirtualKey VK_OEM_MINUS = (VirtualKey)0xBD;
-    private const VirtualKey VK_OEM_PERIOD = (VirtualKey)0xBE;
-
     [ObservableProperty] public partial bool ControlsHidden { get; set; }
     [ObservableProperty] public partial bool IsPlaying { get; set; }
     [ObservableProperty] public partial bool IsOpening { get; set; }
@@ -99,6 +95,11 @@ public sealed partial class PlayerPageViewModel : ObservableRecipient,
 
     public bool IsPlayerVisibilityVisible => PlayerVisibility is PlayerVisibilityState.Visible;
 
+    /// <summary>
+    /// Gets the key combinations assigned to the player actions.
+    /// </summary>
+    public HotkeyMap Hotkeys => _hotkeyContext.Map;
+
     private IMediaPlayer? MediaPlayer => _playerContext.MediaPlayer;
 
     private readonly DispatcherQueue _dispatcherQueue;
@@ -111,6 +112,8 @@ public sealed partial class PlayerPageViewModel : ObservableRecipient,
     private readonly ISettingsService _settingsService;
     private readonly IFilesService _filesService;
     private readonly PlayerContext _playerContext;
+    private readonly INavigationService _navigationService;
+    private readonly HotkeyContext _hotkeyContext;
     private bool _visibilityOverride;
     private bool _resizeNext;
     private bool _isPlayPauseHoldActive;
@@ -118,12 +121,14 @@ public sealed partial class PlayerPageViewModel : ObservableRecipient,
 
     public PlayerPageViewModel(IWindowService windowService,
         ISettingsService settingsService, IFilesService filesService, PlayerContext playerContext,
-        INavigationService navigationService)
+        INavigationService navigationService, HotkeyContext hotkeyContext)
     {
         _windowService = windowService;
         _settingsService = settingsService;
         _filesService = filesService;
         _playerContext = playerContext;
+        _navigationService = navigationService;
+        _hotkeyContext = hotkeyContext;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _openingTimer = _dispatcherQueue.CreateTimer();
         _controlsVisibilityTimer = _dispatcherQueue.CreateTimer();
@@ -144,6 +149,7 @@ public sealed partial class PlayerPageViewModel : ObservableRecipient,
         }
 
         Messenger.Register<TogglePlayerVisibilityMessage>(this);
+        Messenger.Register<ShowSettingsPageMessage>(this);
         Messenger.Register<PlayerOsdUpdateMessage>(this);
         Messenger.Register<PropertyChangedMessage<IMediaPlayer?>>(this);
         Messenger.Register<QueueCurrentItemChangedMessage>(this);
@@ -163,6 +169,44 @@ public sealed partial class PlayerPageViewModel : ObservableRecipient,
     {
         if (message.Path is null) return;
         ShowVisualizer = AudioOnly && !string.IsNullOrEmpty(message.Path);
+    }
+
+    public void Receive(ShowSettingsPageMessage message)
+    {
+        // This comes from the player menu, which is still closing, and whose button belongs to the player
+        // that is about to shrink into the mini player. Changing the page while the menu is going away
+        // pulls the tree apart underneath it, so the page change waits for the menu to finish.
+        _dispatcherQueue.TryEnqueue(ShowSettingsPage);
+    }
+
+    /// <summary>
+    /// Shows the settings page.
+    /// </summary>
+    /// <remarks>
+    /// Navigating brings the full player back to the mini player on its own, in
+    /// <see cref="OnNavigationServiceNavigated"/>. Only full screen and compact overlay, which have a layout
+    /// of their own, have to be left first.
+    /// </remarks>
+    public void ShowSettingsPage()
+    {
+        switch (_windowService.ViewMode)
+        {
+            case WindowViewMode.FullScreen:
+                _windowService.ExitFullScreen();
+                break;
+            case WindowViewMode.Compact:
+                // Leaving compact overlay takes a moment, and the page can only be shown afterwards.
+                _ = ShowSettingsPageFromCompactAsync();
+                return;
+        }
+
+        _navigationService.Navigate(typeof(SettingsPageViewModel));
+    }
+
+    private async Task ShowSettingsPageFromCompactAsync()
+    {
+        await _windowService.TryExitCompactLayoutAsync();
+        _navigationService.Navigate(typeof(SettingsPageViewModel));
     }
 
     public void Receive(TogglePlayerVisibilityMessage message)
@@ -404,231 +448,37 @@ public sealed partial class PlayerPageViewModel : ObservableRecipient,
     }
 
     /// <summary>
-    /// Handles a volume increment or decrement based on the specified key.
+    /// Shows the player controls and restarts the timer that hides them again, as moving the pointer does.
     /// </summary>
-    /// <remarks>
-    /// The following keys determine the volume delta:
-    /// <list type="bullet">
-    /// <item><description><see cref="VirtualKey.Add"/>, (<see cref="VirtualKey"/>)0xBB (VK_OEM_PLUS),
-    /// or <see cref="VirtualKey.Up"/> (when player is visible): Increase volume by <c>5</c>.</description></item>
-    /// <item><description><see cref="VirtualKey.Subtract"/>, (<see cref="VirtualKey"/>)0xBD (VK_OEM_MINUS),
-    /// or <see cref="VirtualKey.Down"/> (when player is visible): Decrease volume by <c>5</c>.</description></item>
-    /// </list>
-    /// </remarks>
-    /// <param name="key">The key that was pressed.</param>
-    public void HandleVolumeKey(VirtualKey key)
+    public void ShowControls()
     {
-        if (MediaPlayer is null)
-            return;
-
-        bool isPlayerVisible = PlayerVisibility == PlayerVisibilityState.Visible;
-        int delta = key switch
-        {
-            VK_OEM_PLUS or VirtualKey.Add => 5,
-            VK_OEM_MINUS or VirtualKey.Subtract => -5,
-            VirtualKey.Up when isPlayerVisible => 5,
-            VirtualKey.Down when isPlayerVisible => -5,
-            _ => 0,
-        };
-
-        if (delta == 0)
-            return;
-
-        int newValue = Messenger.Send(new ChangeVolumeRequestMessage(delta, true));
-        Messenger.Send(new PlayerOsdUpdateMessage(PlaybackCommandKind.Volume, value: newValue).ShowBadge().ShowMessage());
+        if (PlayerVisibility != PlayerVisibilityState.Visible) return;
+        ControlsHidden = false;
+        DelayHideControls();
     }
 
     /// <summary>
-    /// Handles a seek operation based on keyboard input.
+    /// Opens the play queue page.
     /// </summary>
-    /// <remarks>
-    /// The following keys determine the seek direction:
-    /// <list type="bullet">
-    /// <item><description><see cref="VirtualKey.L"/> or <see cref="VirtualKey.Right"/> (when player is visible): Seek forward.</description></item>
-    /// <item><description><see cref="VirtualKey.J"/> or <see cref="VirtualKey.Left"/> (when player is visible): Seek backward.</description></item>
-    /// </list>
-    /// The seek duration is determined by the following modifier keys:
-    /// <list type="bullet">
-    /// <item><description><see cref="VirtualKeyModifiers.None"/>: Seek using the default interval.</description></item>
-    /// <item><description><see cref="VirtualKeyModifiers.Control"/>: Seek using double (<c>2×</c>) the configured interval.</description></item>
-    /// <item><description><see cref="VirtualKeyModifiers.Shift"/>: Seek using one-fifth (<c>1/5</c>) of the configured interval.</description></item>
-    /// </list>
-    /// The default seek intervals are based on the configured <see cref="ISettingsService.PlayerRewindStep"/>
-    /// and <see cref="ISettingsService.PlayerFastForwardStep"/> values.
-    /// </remarks>
-    /// <param name="key">A value of the enumeration that specifies the key that was pressed.</param>
-    /// <param name="modifiers">A bitwise combination of the enumeration values that specifies the modifier keys held during the key press.</param>
-    public void HandleSeekKey(VirtualKey key, VirtualKeyModifiers modifiers)
+    public void ShowPlayQueuePage()
     {
-        if (MediaPlayer is null)
-            return;
-
-        bool isPlayerVisible = PlayerVisibility == PlayerVisibilityState.Visible;
-        int step = key switch
-        {
-            VirtualKey.Left when isPlayerVisible => -_settingsService.PlayerRewindStep,
-            VirtualKey.Right when isPlayerVisible => _settingsService.PlayerFastForwardStep,
-            VirtualKey.J => -_settingsService.PlayerRewindStep,
-            VirtualKey.L => _settingsService.PlayerFastForwardStep,
-            _ => 0,
-        };
-
-        double factor = modifiers switch
-        {
-            VirtualKeyModifiers.None => 1,
-            VirtualKeyModifiers.Control => 2,
-            VirtualKeyModifiers.Shift => 0.2,
-            _ => 0,
-        };
-
-        double delta = step * factor;
-        if (delta == 0)
-            return;
-
-        Messenger.SendSeekWithStatus(TimeSpan.FromSeconds(delta));
+        _navigationService.Navigate(typeof(PlayQueuePageViewModel));
     }
 
     /// <summary>
-    /// Handles jumping to a specific playback position by percentage based on the specified key.
+    /// Resizes the window for a window size keyboard shortcut.
     /// </summary>
     /// <remarks>
-    /// <para>Requires <see cref="PlayerVisibility"/> to be <see cref="PlayerVisibilityState.Visible"/>.</para>
-    /// The following keys determine the jump action:
     /// <list type="bullet">
-    /// <item><description><see cref="VirtualKey.Home"/>: Seek to start.</description></item>
-    /// <item><description><see cref="VirtualKey.End"/>: Seek to end.</description></item>
-    /// <item><description><see cref="VirtualKey.NumberPad0"/> to <see cref="VirtualKey.NumberPad9"/>: Seek to percentage of duration.</description></item>
+    /// <item><description><see cref="PlayerHotkeyAction.ResizeWindowHalf"/>, <see cref="PlayerHotkeyAction.ResizeWindowOriginal"/> and
+    /// <see cref="PlayerHotkeyAction.ResizeWindowOneAndHalf"/>: Resize to 50%, 100% or 150% of the video size.</description></item>
+    /// <item><description><see cref="PlayerHotkeyAction.ResizeWindowToScreen"/>: Resize to fill the screen.</description></item>
+    /// <item><description><see cref="PlayerHotkeyAction.GrowWindow"/> and <see cref="PlayerHotkeyAction.ShrinkWindow"/>: Change the window size by 10%.</description></item>
     /// </list>
     /// </remarks>
-    /// <param name="key">The key that was pressed.</param>
-    public void HandlePercentJumpKey(VirtualKey key)
-    {
-        if (MediaPlayer is null || PlayerVisibility != PlayerVisibilityState.Visible)
-            return;
-
-        PositionChangedResult result;
-        string extra = string.Empty;
-        switch (key)
-        {
-            case VirtualKey.Home:
-                result = Messenger.Send(new ChangeTimeRequestMessage(TimeSpan.Zero));
-                break;
-            case VirtualKey.End:
-                result = Messenger.Send(new ChangeTimeRequestMessage(MediaPlayer.NaturalDuration));
-                break;
-            case VirtualKey.NumberPad0:
-            case VirtualKey.NumberPad1:
-            case VirtualKey.NumberPad2:
-            case VirtualKey.NumberPad3:
-            case VirtualKey.NumberPad4:
-            case VirtualKey.NumberPad5:
-            case VirtualKey.NumberPad6:
-            case VirtualKey.NumberPad7:
-            case VirtualKey.NumberPad8:
-            case VirtualKey.NumberPad9:
-                int percent = (key - VirtualKey.NumberPad0) * 10;
-                TimeSpan newPosition = MediaPlayer.NaturalDuration * (0.01 * percent);
-                result = Messenger.Send(new ChangeTimeRequestMessage(newPosition));
-                extra = $"{percent}%";
-                break;
-            default:
-                return;
-        }
-
-        Messenger.SendPositionStatus(result.NewPosition, result.NaturalDuration, extra);
-    }
-
-    /// <summary>
-    /// Handles a playback rate increment or decrement based on keyboard input.
-    /// </summary>
-    /// <remarks>
-    /// <para>Requires <see cref="PlayerVisibility"/> to be <see cref="PlayerVisibilityState.Visible"/>.</para>
-    /// The following keys, in combination with the <see cref="VirtualKeyModifiers.Shift"/> modifier, determine the change:
-    /// <list type="bullet">
-    /// <item><description>(<see cref="VirtualKey"/>)0xBE (VK_OEM_PERIOD): Increase playback rate by 0.25x.</description></item>
-    /// <item><description>(<see cref="VirtualKey"/>)0xBC (VK_OEM_COMMA): Decrease playback rate by 0.25x.</description></item>
-    /// </list>
-    /// The playback rate is clamped between 0.25x and 4x.
-    /// </remarks>
-    /// <param name="key">The key that was pressed.</param>
-    /// <param name="modifiers">The modifier keys held during the key press.</param>
-    public void HandlePlaybackRateToggleKey(VirtualKey key, VirtualKeyModifiers modifiers)
-    {
-        const double PlaybackRateStep = 0.25;
-
-        if (MediaPlayer is null ||
-            modifiers != VirtualKeyModifiers.Shift ||
-            PlayerVisibility != PlayerVisibilityState.Visible)
-            return;
-
-        double delta = key switch
-        {
-            VK_OEM_PERIOD => PlaybackRateStep,  // Shift + . (">")
-            VK_OEM_COMMA => -PlaybackRateStep,  // Shift + , ("<")
-            _ => 0.0,
-        };
-
-        if (delta == 0.0)
-            return;
-
-        double newRate = Messenger.Send(new ChangePlaybackRateRequestMessage(Math.Clamp(MediaPlayer.PlaybackRate + delta, 0.25, 4)));
-        Messenger.Send(
-            new PlayerOsdUpdateMessage(
-                delta > 0 ? PlaybackCommandKind.RateUp : PlaybackCommandKind.RateDown,
-                value: newRate)
-            .ShowBadge()
-            .ShowMessage());
-    }
-
-    /// <summary>
-    /// Handles frame-stepping based on the specified key.
-    /// </summary>
-    /// <remarks>
-    /// Requires <see cref="PlayerVisibility"/> to be <see cref="PlayerVisibilityState.Visible"/>,
-    /// <see cref="MediaPlayer.CanSeek"/> to be true, and <see cref="MediaPlayer.PlaybackState"/>
-    /// to be <see cref="MediaPlaybackState.Paused"/>.
-    /// <list type="bullet">
-    /// <item><description>(<see cref="VirtualKey"/>)0xBE (VK_OEM_PERIOD): Step forward one frame.</description></item>
-    /// <item><description>(<see cref="VirtualKey"/>)0xBC (VK_OEM_COMMA): Step backward one frame.</description></item>
-    /// </list>
-    /// </remarks>
-    /// <param name="key">The key that was pressed.</param>
-    public void HandleFrameSteppingKey(VirtualKey key)
-    {
-        if (PlayerVisibility != PlayerVisibilityState.Visible ||
-            !(MediaPlayer?.CanSeek ?? false) ||
-            MediaPlayer.PlaybackState != MediaPlaybackState.Paused)
-            return;
-
-        switch (key)
-        {
-            case VK_OEM_PERIOD:
-                MediaPlayer.StepForwardOneFrame();
-                return;
-            case VK_OEM_COMMA:
-                MediaPlayer.StepBackwardOneFrame();
-                return;
-        }
-    }
-
-    /// <summary>
-    /// Handles a window resize operation based on keyboard input.
-    /// </summary>
-    /// <remarks>
-    /// The following keys determine the resize action:
-    /// <list type="bullet">
-    /// <item><description><see cref="VirtualKey.Number1"/>: Resize to 50% of video size.</description></item>
-    /// <item><description><see cref="VirtualKey.Number2"/>: Resize to 100% of video size.</description></item>
-    /// <item><description><see cref="VirtualKey.Number3"/>: Resize to 150% of video size.</description></item>
-    /// <item><description><see cref="VirtualKey.Number4"/>: Resize to fill screen.</description></item>
-    /// <item><description>(<see cref="VirtualKey"/>)0xBB (VK_OEM_PLUS) with <see cref="VirtualKeyModifiers.Control"/>: Increase window size by 10%.</description></item>
-    /// <item><description>(<see cref="VirtualKey"/>)0xBD (VK_OEM_MINUS) with <see cref="VirtualKeyModifiers.Control"/>: Decrease window size by 10%.</description></item>
-    /// </list>
-    /// </remarks>
-    /// <param name="key">The key that was pressed.</param>
-    /// <param name="modifiers">The modifier keys held during the key press.</param>
+    /// <param name="action">The window size action.</param>
     /// <param name="currentSize">The size of the current window.</param>
-    public void HandleResizeKey(VirtualKey key, VirtualKeyModifiers modifiers, Size currentSize)
+    public void ResizeWindow(PlayerHotkeyAction action, Size currentSize)
     {
         if (MediaPlayer is null)
             return;
@@ -642,21 +492,22 @@ public sealed partial class PlayerPageViewModel : ObservableRecipient,
         double stepWidth = Math.Round(currentSize.Width * 0.1);
         double desiredStep = Math.Min(stepWidth / currentSize.Width, stepHeight / currentSize.Height);
 
-        double? scale = key switch
+        double? scale = action switch
         {
-            VirtualKey.Number1 when modifiers == VirtualKeyModifiers.None => 0.5,
-            VirtualKey.Number2 when modifiers == VirtualKeyModifiers.None => 1.0,
-            VirtualKey.Number3 when modifiers == VirtualKeyModifiers.None => 1.5,
-            VirtualKey.Number4 when modifiers == VirtualKeyModifiers.None => 0.0,
-            VK_OEM_PLUS when modifiers == VirtualKeyModifiers.Control => 1 + desiredStep,   // Plus  ("+")
-            VK_OEM_MINUS when modifiers == VirtualKeyModifiers.Control => 1 - desiredStep,  // Minus ("-")
+            PlayerHotkeyAction.ResizeWindowHalf => 0.5,
+            PlayerHotkeyAction.ResizeWindowOriginal => 1.0,
+            PlayerHotkeyAction.ResizeWindowOneAndHalf => 1.5,
+            PlayerHotkeyAction.ResizeWindowToScreen => 0.0,
+            PlayerHotkeyAction.GrowWindow => 1 + desiredStep,
+            PlayerHotkeyAction.ShrinkWindow => 1 - desiredStep,
             _ => null,
         };
 
         if (scale is null)
             return;
 
-        double? newScalar = ResizeWindow(desiredSize: modifiers == VirtualKeyModifiers.None ? videoSize : currentSize, scalar: scale.Value);
+        bool isStep = action is PlayerHotkeyAction.GrowWindow or PlayerHotkeyAction.ShrinkWindow;
+        double? newScalar = ResizeWindow(desiredSize: isStep ? currentSize : videoSize, scalar: scale.Value);
         if (newScalar is null or <= 0)
             return;
 

@@ -11,6 +11,7 @@ using Screenbox.Core.Coordinators;
 using Screenbox.Core.Enums;
 using Screenbox.Core.Helpers;
 using Screenbox.Core.Messages;
+using Screenbox.Core.Models;
 using Screenbox.Core.Playback;
 using Screenbox.Core.Services;
 using Windows.Foundation;
@@ -37,10 +38,9 @@ public sealed partial class PlayerControlsViewModel : ObservableRecipient,
     public bool ShouldBeAdaptive => !IsCompact && SystemInformation.IsDesktop;
 
     /// <summary>
-    /// Gets a value that indicates whether the current playback item has exactly one subtitle track.
+    /// Gets the key combinations assigned to the player actions.
     /// </summary>
-    /// <value><see langword="true"/> if the current playback item has exactly one subtitle track; otherwise, <see langword="false"/>.</value>
-    public bool HasSingleSubtitleTrackCount => MediaPlayer?.PlaybackItem is { SubtitleTracks.Count: 1 };
+    public HotkeyMap Hotkeys => _hotkeyContext.Map;
 
     [ObservableProperty] public partial bool IsPlaying { get; set; }
     [ObservableProperty] public partial bool IsFullscreen { get; set; }
@@ -52,6 +52,12 @@ public sealed partial class PlayerControlsViewModel : ObservableRecipient,
     [ObservableProperty] public partial bool IsMinimal { get; set; }
     [ObservableProperty] public partial bool PlayerShowChapters { get; set; }
     [ObservableProperty] public partial bool IsDisplayingRemainingTime { get; set; }
+
+    /// <summary>
+    /// Gets the aspect ratio option that the video is cropped to.
+    /// </summary>
+    /// <value><c>Fit</c>, <c>Fill</c>, or a ratio in <c>width:height</c> form, such as <c>16:9</c>.</value>
+    [ObservableProperty] public partial string AspectRatio { get; private set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShouldBeAdaptive))]
@@ -73,6 +79,7 @@ public sealed partial class PlayerControlsViewModel : ObservableRecipient,
     private readonly PlayerContext _playerContext;
     private readonly IFilesService _filesService;
     private readonly IPlayQueueCoordinator _coordinator;
+    private readonly HotkeyContext _hotkeyContext;
 
     private Size _aspectRatio;
 
@@ -82,7 +89,8 @@ public sealed partial class PlayerControlsViewModel : ObservableRecipient,
         IPlayQueueCoordinator coordinator,
         ISettingsService settingsService,
         IWindowService windowService,
-        PlayerContext playerContext)
+        PlayerContext playerContext,
+        HotkeyContext hotkeyContext)
     {
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _windowService = windowService;
@@ -90,9 +98,11 @@ public sealed partial class PlayerControlsViewModel : ObservableRecipient,
         _playerContext = playerContext;
         _filesService = filesService;
         _coordinator = coordinator;
+        _hotkeyContext = hotkeyContext;
         PlaybackRate = 1.0;
         AudioTimingOffset = 0.0;
         SubtitleTimingOffset = 0.0;
+        AspectRatio = "Fit";
         IsAdvancedModeActive = settingsService.AdvancedMode;
         IsMinimal = true;
         IsDisplayingRemainingTime = settingsService.PersistentShowRemainingTime;
@@ -142,6 +152,9 @@ public sealed partial class PlayerControlsViewModel : ObservableRecipient,
             MediaPlayer.PlaybackStateChanged += OnPlaybackStateChanged;
             MediaPlayer.NaturalVideoSizeChanged += OnNaturalVideoSizeChanged;
         }
+
+        // A new player starts with the default aspect ratio, zoom and deinterlacing.
+        ResetHotkeyStateForNewPlayer();
     }
 
     public void Receive(TogglePlayPauseMessage message)
@@ -178,52 +191,6 @@ public sealed partial class PlayerControlsViewModel : ObservableRecipient,
 
         PlayPause();
         Messenger.Send(new PlayerOsdUpdateMessage(IsPlaying ? PlaybackCommandKind.Pause : PlaybackCommandKind.Play).ShowBadge());
-    }
-
-    /// <summary>
-    /// Handles toggling the subtitle track during media playback based on keyboard input.
-    /// </summary>
-    /// <remarks>
-    /// The following modifiers determine the toggle action:
-    /// <list type="bullet">
-    /// <item><description><see cref="VirtualKeyModifiers.None"/> toggles the only subtitle track on or off.</description></item>
-    /// <item><description><see cref="VirtualKeyModifiers.Control"/> cycles forward through the available subtitle tracks.</description></item>
-    /// <item><description><see cref="VirtualKeyModifiers.Control"/> + <see cref="VirtualKeyModifiers.Shift"/> cycles backward through the available subtitle tracks.</description></item>
-    /// </list>
-    /// </remarks>
-    /// <param name="modifiers">The modifier keys held during the key press.</param>
-    public void HandleSubtitleToggleKey(VirtualKeyModifiers modifiers)
-    {
-        if (MediaPlayer?.PlaybackItem is null)
-            return;
-
-        PlaybackSubtitleTrackList tracks = MediaPlayer.PlaybackItem.SubtitleTracks;
-        int count = tracks.Count;
-        if (count == 0 || (count > 1 && modifiers == VirtualKeyModifiers.None))
-            return;
-
-        int oldIndex = tracks.SelectedIndex;
-
-        tracks.SelectedIndex = modifiers switch
-        {
-            VirtualKeyModifiers.None when count == 1
-                => oldIndex >= 0 ? -1 : 0,
-            VirtualKeyModifiers.Control
-                => oldIndex == count - 1 ? -1 : ++oldIndex,
-            VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift
-                => oldIndex == -1 ? count - 1 : --oldIndex,
-            _ => oldIndex,
-        };
-
-        string? label = tracks.SelectedIndex == -1
-            ? null
-            : tracks[tracks.SelectedIndex].Label;
-
-        Messenger.Send(
-            new PlayerOsdUpdateMessage(
-                label is null ? PlaybackCommandKind.SubtitleOff : PlaybackCommandKind.Subtitle,
-                value: label)
-            .ShowMessage());
     }
 
     partial void OnIsDisplayingRemainingTimeChanged(bool value)
@@ -265,6 +232,7 @@ public sealed partial class PlayerControlsViewModel : ObservableRecipient,
                 HasActiveItem = PlayQueue.CurrentItem is not null;
                 SubtitleTimingOffset = 0;
                 AudioTimingOffset = 0;
+                ResetHotkeyStateForNewMedia();
                 break;
         }
     }
@@ -339,8 +307,30 @@ public sealed partial class PlayerControlsViewModel : ObservableRecipient,
         PlaybackRate = rate;
     }
 
+    /// <summary>
+    /// Shows the settings page. The player page brings the player back to the mini player first.
+    /// </summary>
+    [RelayCommand]
+    private void ShowSettings()
+    {
+        Messenger.Send(new ShowSettingsPageMessage());
+    }
+
     [RelayCommand]
     private void SetAspectRatio(string aspect)
+    {
+        if (TryApplyAspectRatio(aspect))
+        {
+            Messenger.Send(new PlayerOsdUpdateMessage(PlaybackCommandKind.AspectRatio, value: aspect).ShowMessage());
+        }
+    }
+
+    /// <summary>
+    /// Crops the video to an aspect ratio option.
+    /// </summary>
+    /// <param name="aspect"><c>Fit</c>, <c>Fill</c>, or a ratio in <c>width:height</c> form, such as <c>16:9</c>.</param>
+    /// <returns><see langword="true"/> if the option is valid and was applied; otherwise, <see langword="false"/>.</returns>
+    private bool TryApplyAspectRatio(string aspect)
     {
         switch (aspect)
         {
@@ -352,15 +342,16 @@ public sealed partial class PlayerControlsViewModel : ObservableRecipient,
                 break;
             default:
                 string[] values = aspect.Split(':', StringSplitOptions.RemoveEmptyEntries);
-                if (values.Length != 2) return;
-                if (!double.TryParse(values[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double width)) return;
-                if (!double.TryParse(values[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double height)) return;
+                if (values.Length != 2) return false;
+                if (!double.TryParse(values[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double width)) return false;
+                if (!double.TryParse(values[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double height)) return false;
                 _aspectRatio = new Size(width, height);
                 break;
         }
 
+        AspectRatio = aspect;
         Messenger.Send(new ChangeAspectRatioMessage(_aspectRatio));
-        Messenger.Send(new PlayerOsdUpdateMessage(PlaybackCommandKind.AspectRatio, value: aspect).ShowMessage());
+        return true;
     }
 
     [RelayCommand]
@@ -369,16 +360,34 @@ public sealed partial class PlayerControlsViewModel : ObservableRecipient,
         if (IsCompact)
         {
             await _windowService.TryExitCompactLayoutAsync();
+            return;
         }
-        else if (MediaPlayer?.NaturalVideoHeight > 0)
+
+        await _windowService.TryEnterCompactLayoutAsync(GetCompactOverlaySize());
+    }
+
+    /// <summary>
+    /// Gets the size to open the compact overlay ("picture in picture") window at.
+    /// </summary>
+    /// <remarks>
+    /// The window keeps the size it was last used at. Without one, it opens as large as Windows allows for
+    /// such a window, which is 500 effective pixels and at most half the screen in each direction.
+    /// </remarks>
+    /// <returns>The size of the window, in effective pixels.</returns>
+    private Size GetCompactOverlaySize()
+    {
+        Size rememberedSize = _settingsService.PlayerCompactOverlaySize;
+        if (rememberedSize is { Width: >= 1, Height: >= 1 })
         {
-            double aspectRatio = MediaPlayer.NaturalVideoWidth / (double)MediaPlayer.NaturalVideoHeight;
-            await _windowService.TryEnterCompactLayoutAsync(new Size(240 * aspectRatio, 240));
+            return rememberedSize;
         }
-        else
-        {
-            await _windowService.TryEnterCompactLayoutAsync(new Size(240, 240));
-        }
+
+        double aspectRatio = MediaPlayer?.NaturalVideoHeight > 0
+            ? MediaPlayer.NaturalVideoWidth / (double)MediaPlayer.NaturalVideoHeight
+            : 1;
+        Size maxSize = _windowService.GetMaxCompactOverlaySize();
+        double height = Math.Min(maxSize.Height, maxSize.Width / aspectRatio);
+        return new Size(height * aspectRatio, height);
     }
 
     [RelayCommand]

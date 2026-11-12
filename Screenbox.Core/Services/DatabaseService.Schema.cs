@@ -27,6 +27,13 @@ public sealed partial class DatabaseService
 
     private async Task InitializeCoreAsync()
     {
+        if (string.IsNullOrEmpty(DbFolderPath))
+        {
+            // Whoever reads the database first can be earlier than the initialization at startup. Without a
+            // folder the database would be opened next to the app, where it cannot be written.
+            DbFolderPath = GetUwpFolderPath();
+        }
+
         string dbPath = Path.Combine(DbFolderPath, DbFileName);
         string connectionString = new SqliteConnectionStringBuilder
         {
@@ -63,6 +70,9 @@ public sealed partial class DatabaseService
             "artist", "album", "album_artist", "composers", "genre", "track_number", "bitrate",
             "subtitle", "producers", "writers", "width", "height", "video_bitrate");
         EnsureReplaceableTable(connection, "playback_progress", CreatePlaybackProgressSql, "location", "position_ticks");
+        EnsureReplaceableTable(connection, "track_preferences", CreateTrackPreferencesSql, "location",
+            "audio_index", "audio_language", "audio_label",
+            "subtitle_index", "subtitle_language", "subtitle_label", "updated_ticks");
         EnsurePlaylistsTable(connection);
         EnsurePlaylistItemsTable(connection);
         migrationComplete = await TryImportLegacyPlaylistsAsync(connection);
@@ -90,6 +100,7 @@ public sealed partial class DatabaseService
         ExecuteNonQuery(connection, CreateLibraryFoldersSql);
         ExecuteNonQuery(connection, CreateMediaRecordsSql);
         ExecuteNonQuery(connection, CreatePlaybackProgressSql);
+        ExecuteNonQuery(connection, CreateTrackPreferencesSql);
         ExecuteNonQuery(connection, CreatePlaylistsSql);
         ExecuteNonQuery(connection, CreatePlaylistItemsSql);
         transaction.Commit();
@@ -364,6 +375,19 @@ public sealed partial class DatabaseService
         CREATE TABLE IF NOT EXISTS playback_progress (
             location      TEXT    PRIMARY KEY,
             position_ticks INTEGER NOT NULL
+        );
+        """;
+
+    private const string CreateTrackPreferencesSql = """
+        CREATE TABLE IF NOT EXISTS track_preferences (
+            location           TEXT    PRIMARY KEY,
+            audio_index        INTEGER,
+            audio_language     TEXT,
+            audio_label        TEXT,
+            subtitle_index     INTEGER,
+            subtitle_language  TEXT,
+            subtitle_label     TEXT,
+            updated_ticks      INTEGER NOT NULL
         );
         """;
 

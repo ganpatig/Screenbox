@@ -1,4 +1,5 @@
 using Screenbox.Core.Enums;
+using Windows.Foundation;
 using Windows.Media;
 
 namespace Screenbox.Core.Services;
@@ -20,6 +21,43 @@ public interface ISettingsService
     bool PersistentShowRemainingTime { get; set; }
 
     bool PlayerShowChapters { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value that indicates whether the seek bar preview shows the video frame
+    /// at the position under the pointer.
+    /// </summary>
+    /// <value>
+    /// <see langword="true"/> if the seek bar preview shows a video frame; otherwise, <see langword="false"/>.
+    /// </value>
+    bool PlayerShowSeekPreview { get; set; }
+
+    /// <summary>
+    /// Gets or sets the keyboard shortcuts that the user changed.
+    /// </summary>
+    /// <value>
+    /// The changed assignments in the form created by <see cref="Models.HotkeyMap.Serialize"/>,
+    /// or an empty string if every shortcut has its default keys.
+    /// </value>
+    string PlayerHotkeys { get; set; }
+
+    /// <summary>
+    /// Gets or sets the audio languages to select for a media item that was never played before.
+    /// </summary>
+    /// <value>
+    /// A comma separated list of language tags, such as "en,fr", or an empty string to keep the track
+    /// that the player picks itself.
+    /// </value>
+    string PlayerPreferredAudioLanguage { get; set; }
+
+    /// <summary>
+    /// Gets or sets the size that the compact overlay ("picture in picture") window is opened at.
+    /// </summary>
+    /// <value>
+    /// The size of the window the last time it was used, in effective pixels, or an empty size to open
+    /// the window as large as the system allows.
+    /// </value>
+    Size PlayerCompactOverlaySize { get; set; }
+
     int PlayerControlsHideDelay { get; set; }
     int PersistentVolume { get; set; }
     string PersistentSubtitleLanguage { get; set; }

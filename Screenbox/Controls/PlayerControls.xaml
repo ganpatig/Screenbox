@@ -60,7 +60,7 @@
                         x:Name="SpeedSlider"
                         Header="{strings:Resources Key=CustomPlaybackSpeed}"
                         IsThumbToolTipEnabled="False"
-                        Maximum="2"
+                        Maximum="4"
                         Minimum="0"
                         SmallChange="0.01"
                         StepFrequency="0.05"
@@ -87,6 +87,10 @@
                     FlowDirection="LeftToRight"
                     Orientation="Vertical"
                     Spacing="8">
+                    <!--
+                        This flyout is created only when it is first opened, so compiled bindings cannot target it.
+                        The code-behind widens the range for delays set with the keyboard shortcuts.
+                    -->
                     <Slider
                         x:Name="SubtitleTimingOffsetSlider"
                         Header="{strings:Resources Key=TimingOffset}"
@@ -106,6 +110,10 @@
                     FlowDirection="LeftToRight"
                     Orientation="Vertical"
                     Spacing="8">
+                    <!--
+                        This flyout is created only when it is first opened, so compiled bindings cannot target it.
+                        The code-behind widens the range for delays set with the keyboard shortcuts.
+                    -->
                     <Slider
                         x:Name="AudioTimingOffsetSlider"
                         Header="{strings:Resources Key=TimingOffset}"
@@ -119,17 +127,15 @@
                 </StackPanel>
             </Flyout>
 
-            <MenuFlyout x:Key="NormalPlayerContextMenu">
+            <MenuFlyout x:Key="NormalPlayerContextMenu" Opening="NormalPlayerContextMenu_OnOpening">
                 <MenuFlyoutItem
+                    x:Name="OpenFilesMenuItem"
                     AccessKey="{x:Bind strings:KeyboardResources.MenuItemFileKey}"
                     Command="{x:Bind Common.OpenFilesCommand}"
                     Icon="{ui:FontIcon FontFamily={StaticResource ScreenboxSymbolThemeFontFamily},
                                        Glyph={StaticResource FolderOpenGlyph}}"
                     KeyTipPlacementMode="Left"
                     Text="{x:Bind strings:Resources.OpenFiles}">
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="O" Modifiers="Control" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutItem
                     Command="{StaticResource OpenWithCommand}"
@@ -147,15 +153,13 @@
                     Text="{x:Bind strings:Resources.OpenInFileExplorer}"
                     Visibility="{x:Bind helpers:DeviceInfoHelper.IsDesktop}" />
                 <MenuFlyoutItem
+                    x:Name="PropertiesMenuItem"
                     AccessKey="{x:Bind strings:KeyboardResources.MenuItemPropertiesKey}"
                     Command="{StaticResource ShowPropertiesCommand}"
                     CommandParameter="{x:Bind ViewModel.PlayQueue.CurrentItem, Mode=OneWay}"
                     Icon="{ui:FontIcon Glyph=&#xE946;}"
                     IsEnabled="{x:Bind ViewModel.HasActiveItem, Mode=OneWay}"
                     Text="{x:Bind strings:Resources.Properties}">
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="I" Modifiers="Control" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSubItem
                     x:Name="PlaybackSpeedSubMenu"
@@ -237,17 +241,16 @@
                         Text="{x:Bind strings:Resources.Custom}" />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutItem
+                    x:Name="SaveFrameMenuItem"
                     AccessKey="{x:Bind strings:KeyboardResources.MenuItemSaveSnapshotKey}"
                     Command="{x:Bind ViewModel.SaveSnapshotCommand}"
                     Icon="{ui:FontIcon FontFamily={StaticResource ScreenboxSymbolThemeFontFamily},
                                        Glyph={StaticResource ImageExportGlyph}}"
                     Text="{x:Bind strings:Resources.SaveCurrentFrame}"
                     Visibility="{x:Bind helpers:DeviceInfoHelper.IsDesktop}">
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="S" Modifiers="Shift" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutItem
+                    x:Name="CastMenuItem"
                     AccessKey="{x:Bind strings:KeyboardResources.MenuItemCastKey}"
                     Click="CastMenuFlyoutItem_OnClick"
                     Icon="{ui:FontIcon Glyph=&#xEC15;,
@@ -255,9 +258,6 @@
                     IsEnabled="{x:Bind IsCastButtonEnabled(ViewModel.HasActiveItem), Mode=OneWay}"
                     KeyTipPlacementMode="Left"
                     Text="{x:Bind strings:Resources.Cast}">
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="K" Modifiers="Control" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSubItem
                     x:Name="AspectRatioSubMenu"
@@ -332,6 +332,13 @@
                     </MenuFlyoutItem.Command>
                 </MenuFlyoutItem>
 
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem
+                    x:Name="SettingsMenuItem"
+                    Command="{x:Bind ViewModel.ShowSettingsCommand}"
+                    Icon="{ui:FontIcon Glyph=&#xE713;}"
+                    Text="{x:Bind strings:Resources.Settings}" />
+
                 <MenuFlyoutSeparator x:Name="ExtraOptionsSeparator" Visibility="Collapsed" />
                 <MenuFlyoutItem
                     x:Name="CompactOverlayMenuItem"
@@ -342,13 +349,6 @@
                                        MirroredWhenRightToLeft=True}"
                     Text="{x:Bind strings:Resources.CompactOverlayToggle(ViewModel.IsCompact), Mode=OneWay}"
                     Visibility="Collapsed">
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator
-                            Key="M"
-                            x:Name="CompactOverlayMenuItemKeyboardAccelerator"
-                            IsEnabled="False"
-                            Modifiers="Control" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutItem
                     x:Name="FullscreenMenuItem"
@@ -358,16 +358,6 @@
                                        MirroredWhenRightToLeft=True}"
                     Text="{x:Bind strings:Resources.FullscreenToggle(ViewModel.IsFullscreen), Mode=OneWay}"
                     Visibility="Collapsed">
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator
-                            Key="F"
-                            x:Name="FullscreenMenuItemKeyboardAccelerator"
-                            IsEnabled="False" />
-                        <KeyboardAccelerator
-                            Key="F11"
-                            x:Name="FullscreenMenuItemFnKeyboardAccelerator"
-                            IsEnabled="False" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
             </MenuFlyout>
         </ResourceDictionary>
@@ -421,11 +411,6 @@
                 Command="{x:Bind ViewModel.PlayPauseCommand}"
                 Style="{StaticResource PlayerButtonStyle}">
                 <FontIcon FontFamily="{StaticResource ScreenboxSymbolThemeFontFamily}" Glyph="{x:Bind converters:GlyphConverter.ToPlayPauseGlyph(ViewModel.IsPlaying), Mode=OneWay}" />
-                <Button.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="P" Invoked="PlayPauseKeyboardAccelerator_OnInvoked" />
-                    <KeyboardAccelerator Key="K" Invoked="PlayPauseKeyboardAccelerator_OnInvoked" />
-                    <KeyboardAccelerator Key="Space" Invoked="PlayPauseKeyboardAccelerator_OnInvoked" />
-                </Button.KeyboardAccelerators>
             </Button>
 
             <!--  Previous + Next  -->
@@ -439,10 +424,6 @@
                 CornerRadius="{Binding Source={StaticResource ControlCornerRadius}, Converter={StaticResource LeftCornerRadiusFilterConverter}}"
                 Style="{StaticResource PlayerButtonStyle}">
                 <FontIcon Glyph="&#xE892;" />
-                <Button.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="PageUp" />
-                    <KeyboardAccelerator Key="P" Modifiers="Shift" />
-                </Button.KeyboardAccelerators>
             </Button>
             <Button
                 x:Name="NextButton"
@@ -454,10 +435,6 @@
                 CornerRadius="{Binding Source={StaticResource ControlCornerRadius}, Converter={StaticResource RightCornerRadiusFilterConverter}}"
                 Style="{StaticResource PlayerButtonStyle}">
                 <FontIcon Glyph="&#xE893;" />
-                <Button.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="PageDown" />
-                    <KeyboardAccelerator Key="N" Modifiers="Shift" />
-                </Button.KeyboardAccelerators>
             </Button>
 
             <!--  Time  -->
@@ -557,9 +534,6 @@
                 Style="{StaticResource PlayerButtonStyle}"
                 Visibility="Collapsed">
                 <FontIcon Glyph="{x:Bind converters:GlyphConverter.ToVolumeGlyph(VolumeControl.ViewModel.IsMute, VolumeControl.ViewModel.Volume), Mode=OneWay}" MirroredWhenRightToLeft="True" />
-                <Button.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="M" />
-                </Button.KeyboardAccelerators>
             </Button>
             <controls:VolumeControl
                 x:Name="VolumeControl"
@@ -578,9 +552,6 @@
                 IsEnabled="{x:Bind IsEnabled, Mode=OneWay}"
                 Style="{StaticResource PlayerToggleButtonStyle}">
                 <FontIcon FontFamily="{StaticResource ScreenboxSymbolThemeFontFamily}" Glyph="{x:Bind converters:GlyphConverter.ToShuffleGlyph(ViewModel.PlayQueue.ShuffleMode), Mode=OneWay}" />
-                <ToggleButton.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="S" Modifiers="Control" />
-                </ToggleButton.KeyboardAccelerators>
             </ToggleButton>
             <!--  Repeat  -->
             <ToggleButton
@@ -594,9 +565,6 @@
                 IsThreeState="True"
                 Style="{StaticResource PlayerToggleButtonStyle}">
                 <FontIcon FontFamily="{StaticResource ScreenboxSymbolThemeFontFamily}" Glyph="{x:Bind converters:GlyphConverter.ToRepeatGlyph(ViewModel.PlayQueue.RepeatMode), Mode=OneWay}" />
-                <ToggleButton.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="R" Modifiers="Control" />
-                </ToggleButton.KeyboardAccelerators>
             </ToggleButton>
             <!--  Audio & Captions  -->
             <Button
@@ -608,17 +576,6 @@
                 IsEnabled="{x:Bind IsEnabled, Mode=OneWay}"
                 Style="{StaticResource PlayerButtonStyle}">
                 <FontIcon Glyph="&#xED1F;" MirroredWhenRightToLeft="True" />
-                <Button.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="C" Invoked="ToggleSubtitleKeyboardAccelerator_OnInvoked" />
-                    <KeyboardAccelerator
-                        Key="C"
-                        Invoked="ToggleSubtitleKeyboardAccelerator_OnInvoked"
-                        Modifiers="Control" />
-                    <KeyboardAccelerator
-                        Key="C"
-                        Invoked="ToggleSubtitleKeyboardAccelerator_OnInvoked"
-                        Modifiers="Control,Shift" />
-                </Button.KeyboardAccelerators>
                 <Button.Flyout>
                     <Flyout
                         x:Name="AudioSubtitlePickerFlyout"
@@ -645,9 +602,6 @@
                     FontFamily="{StaticResource ScreenboxSymbolThemeFontFamily}"
                     Glyph="{StaticResource MiniContract2MirroredGlyph}"
                     MirroredWhenRightToLeft="True" />
-                <Button.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="M" Modifiers="Control" />
-                </Button.KeyboardAccelerators>
             </Button>
             <!--  Fullscreen  -->
             <Button
@@ -663,10 +617,6 @@
                     x:Name="FullscreenButtonIcon"
                     Glyph="&#xE740;"
                     MirroredWhenRightToLeft="True" />
-                <Button.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="F" />
-                    <KeyboardAccelerator Key="F11" />
-                </Button.KeyboardAccelerators>
             </Button>
             <!--  More  -->
             <Button
@@ -701,10 +651,7 @@
                         <Setter Target="FullscreenButton.Visibility" Value="Collapsed" />
                         <Setter Target="ExtraOptionsSeparator.Visibility" Value="Visible" />
                         <Setter Target="FullscreenMenuItem.Visibility" Value="Visible" />
-                        <Setter Target="FullscreenMenuItemKeyboardAccelerator.IsEnabled" Value="True" />
-                        <Setter Target="FullscreenMenuItemFnKeyboardAccelerator.IsEnabled" Value="True" />
                         <Setter Target="CompactOverlayMenuItem.Visibility" Value="Visible" />
-                        <Setter Target="CompactOverlayMenuItemKeyboardAccelerator.IsEnabled" Value="True" />
                     </VisualState.Setters>
                     <Storyboard>
                         <RepositionThemeAnimation FromHorizontalOffset="-100" TargetName="ShuffleButton" />

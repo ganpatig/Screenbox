@@ -1,17 +1,24 @@
 using System;
 using System.ComponentModel;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using CommunityToolkit.Diagnostics;
 using CommunityToolkit.Mvvm.DependencyInjection;
 using CommunityToolkit.WinUI;
+using Screenbox.Commands;
 using Screenbox.Controls;
 using Screenbox.Converters;
 using Screenbox.Core.Enums;
+using Screenbox.Core.Helpers;
+using Screenbox.Core.Models;
 using Screenbox.Core.ViewModels;
+using Screenbox.Dialogs;
 using Screenbox.Helpers;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
+using Windows.Media;
 using Windows.System;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
@@ -36,8 +43,11 @@ public sealed partial class PlayerPage : Page
     private static readonly bool _isArabicLanguage = CultureInfo.CurrentCulture.TwoLetterISOLanguageName == "ar";
 
     private readonly DispatcherQueueTimer _delayFlyoutOpenTimer;
+    private readonly ShowPropertiesCommand _showPropertiesCommand = new();
     private CancellationTokenSource? _animationCancellationTokenSource;
     private bool _startup;
+    private bool _isAltShortcutPressed;
+    private VirtualKey _playPauseKey;
 
     public PlayerPage()
     {
@@ -51,6 +61,231 @@ public sealed partial class PlayerPage : Page
         ViewModel.PropertyChanged += ViewModelOnPropertyChanged;
         AlbumArtImage.RegisterPropertyChangedCallback(ImageBrush.ImageSourceProperty, AlbumArtImageOnSourceChanged);
         LayoutRoot.ActualThemeChanged += OnActualThemeChanged;
+    }
+
+    /// <summary>
+    /// Handles a key event that belongs to the keyboard shortcuts of the player.
+    /// </summary>
+    /// <remarks>
+    /// The main page passes every key event of the window to this method before the focused control receives it,
+    /// so that the shortcuts work wherever the focus is, like they do in VLC. The keys of each action come from
+    /// <see cref="PlayerPageViewModel.Hotkeys"/>, which the user can change.
+    /// </remarks>
+    /// <param name="args">The key event of the window.</param>
+    /// <returns><see langword="true"/> if the key event was a shortcut and was handled; otherwise, <see langword="false"/>.</returns>
+    public bool TryHandleKeyboardShortcut(AcceleratorKeyEventArgs args)
+    {
+        return args.EventType switch
+        {
+            CoreAcceleratorKeyEventType.KeyDown or CoreAcceleratorKeyEventType.SystemKeyDown => HandleKeyDown(args.VirtualKey, args.KeyStatus),
+            CoreAcceleratorKeyEventType.KeyUp or CoreAcceleratorKeyEventType.SystemKeyUp => HandleKeyUp(args.VirtualKey),
+            _ => false,
+        };
+    }
+
+    private bool HandleKeyDown(VirtualKey key, CorePhysicalKeyStatus keyStatus)
+    {
+        HotkeyBinding binding = new(key, KeyboardAcceleratorHelper.GetModifiers(keyStatus));
+
+        // Modifier keys alone are not shortcuts, and key combinations with the Windows key belong to the system.
+        if (!HotkeyHelper.IsAssignable(binding) || KeyboardAcceleratorHelper.IsWindowsKeyDown)
+        {
+            return false;
+        }
+
+        bool isShortcut = ViewModel.Hotkeys.TryGetAction(binding, out PlayerHotkeyAction action);
+        bool isArrowKey = key is VirtualKey.Left or VirtualKey.Right or VirtualKey.Up or VirtualKey.Down;
+        bool isHandled = isShortcut && TryHandleShortcutAction(action, keyStatus.WasKeyDown, isArrowKey, key);
+        if (isHandled && binding.Modifiers.HasFlag(VirtualKeyModifiers.Menu))
+        {
+            _isAltShortcutPressed = true;
+        }
+
+        return isHandled;
+    }
+
+    private bool HandleKeyUp(VirtualKey key)
+    {
+        if (_playPauseKey is not VirtualKey.None && key == _playPauseKey)
+        {
+            // Releasing the key plays or pauses, unless holding the key sped up playback.
+            _playPauseKey = VirtualKey.None;
+            ViewModel.HandlePlayPauseKeyUp();
+            return true;
+        }
+
+        if (key is VirtualKey.Menu or VirtualKey.LeftMenu or VirtualKey.RightMenu)
+        {
+            // The page never saw the key that was pressed with Alt, so releasing Alt would
+            // look like a lone Alt press and show the access keys. Hide that release from the page.
+            bool wasAltShortcutPressed = _isAltShortcutPressed;
+            _isAltShortcutPressed = false;
+            return wasAltShortcutPressed;
+        }
+
+        return false;
+    }
+
+    private bool TryHandleShortcutAction(PlayerHotkeyAction action, bool isRepeat, bool isArrowKey, VirtualKey key)
+    {
+        if (!CanHandleShortcut(action, isArrowKey))
+        {
+            return false;
+        }
+
+        // Holding a key repeats adjustments, but not toggles or dialogs. The repeated key presses
+        // are still handled, so that they do not reach the focused control either.
+        if (isRepeat && !HotkeyHelper.IsRepeatable(action))
+        {
+            return true;
+        }
+
+        switch (action)
+        {
+            case PlayerHotkeyAction.PlayPause:
+                // Playback toggles when the key is released, because holding the key plays at double speed instead.
+                _playPauseKey = key;
+                ViewModel.HandlePlayPauseKeyDown();
+                break;
+            case PlayerHotkeyAction.ToggleMute:
+                VolumeViewModel volume = Ioc.Default.GetRequiredService<VolumeViewModel>();
+                volume.IsMute = !volume.IsMute;
+                break;
+            case PlayerHotkeyAction.OpenFiles:
+                Ioc.Default.GetRequiredService<CommonViewModel>().OpenFilesCommand.Execute(null);
+                break;
+            case PlayerHotkeyAction.ShowMediaInfo:
+                _showPropertiesCommand.Execute(PlayerControls.ViewModel.PlayQueue.CurrentItem);
+                break;
+            case PlayerHotkeyAction.Cast:
+                PlayerControls.ShowCastFlyout();
+                break;
+            case PlayerHotkeyAction.ExitFullscreen:
+                ExitFullscreenOrHideControls();
+                break;
+            case PlayerHotkeyAction.ResizeWindowHalf or PlayerHotkeyAction.ResizeWindowOriginal or PlayerHotkeyAction.ResizeWindowOneAndHalf
+                or PlayerHotkeyAction.ResizeWindowToScreen or PlayerHotkeyAction.GrowWindow or PlayerHotkeyAction.ShrinkWindow:
+                Rect bounds = Window.Current.CoreWindow.Bounds;
+                ViewModel.ResizeWindow(action, new Size(bounds.Width, bounds.Height));
+                break;
+            case PlayerHotkeyAction.ShowControls:
+                ViewModel.ShowControls();
+                break;
+            case PlayerHotkeyAction.ShowContextMenu:
+                VideoView.ContextFlyout?.ShowAt(PlayerControls,
+                    new FlyoutShowOptions { Placement = GlobalizationHelper.MirrorWhenRightToLeft(FlyoutPlacementMode.TopEdgeAlignedRight) });
+                break;
+            case PlayerHotkeyAction.ShowPlayQueue:
+                ShowPlayQueue();
+                break;
+            case PlayerHotkeyAction.JumpToTime:
+                _ = ShowJumpToTimeDialogAsync();
+                break;
+            case PlayerHotkeyAction.ShowKeyboardShortcuts:
+                _ = KeyboardShortcutsDialog.ShowShortcutsAsync();
+                break;
+            default:
+                PlayerControls.ViewModel.ExecuteHotkey(action);
+                break;
+        }
+
+        return true;
+    }
+
+    [DynamicWindowsRuntimeCast(typeof(TextBox))]
+    [DynamicWindowsRuntimeCast(typeof(PasswordBox))]
+    [DynamicWindowsRuntimeCast(typeof(RichEditBox))]
+    [DynamicWindowsRuntimeCast(typeof(Slider))]
+    [DynamicWindowsRuntimeCast(typeof(ContentDialog))]
+    [DynamicWindowsRuntimeCast(typeof(DependencyObject))]
+    private bool CanHandleShortcut(PlayerHotkeyAction action, bool isArrowKey)
+    {
+        object? focusedElement = FocusManager.GetFocusedElement();
+
+        // Keys typed into a text field are text, not shortcuts.
+        if (focusedElement is TextBox or PasswordBox or RichEditBox)
+        {
+            return false;
+        }
+
+        // Dialogs, menus and flyouts use the keys themselves. Shortcuts must not act behind them.
+        foreach (Popup popup in VisualTreeHelper.GetOpenPopups(Window.Current))
+        {
+            if (popup.Child is ContentDialog ||
+                (focusedElement is DependencyObject element && IsInVisualTree(element, popup.Child)))
+            {
+                return false;
+            }
+        }
+
+        // A slider that is engaged for keyboard or gamepad input moves with the arrow keys.
+        if (isArrowKey && focusedElement is Slider { IsFocusEngaged: true })
+        {
+            return false;
+        }
+
+        if (ViewModel.PlayerVisibility != PlayerVisibilityState.Visible && !HotkeyHelper.IsAvailableOutsidePlayer(action))
+        {
+            return false;
+        }
+
+        return !HotkeyHelper.RequiresMedia(action) || ViewModel.Media is not null;
+    }
+
+    private static bool IsInVisualTree(DependencyObject element, DependencyObject? root)
+    {
+        for (DependencyObject? node = element; node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (ReferenceEquals(node, root))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ExitFullscreenOrHideControls()
+    {
+        if (ViewModel.ViewMode is WindowViewMode.Compact or WindowViewMode.FullScreen)
+        {
+            ViewModel.GoBack();
+        }
+        else
+        {
+            ViewModel.TryHideControls();
+        }
+    }
+
+    private void ShowPlayQueue()
+    {
+        if (ViewModel.PlayerVisibility != PlayerVisibilityState.Visible)
+        {
+            ViewModel.ShowPlayQueuePage();
+        }
+        else if (ViewModel.ViewMode != WindowViewMode.Compact)
+        {
+            ViewModel.ControlsHidden = false;
+            PlayQueueFlyout.ShowAt(PlayQueueButton,
+                new FlyoutShowOptions { Placement = GlobalizationHelper.MirrorWhenRightToLeft(FlyoutPlacementMode.BottomEdgeAlignedLeft) });
+        }
+    }
+
+    private async Task ShowJumpToTimeDialogAsync()
+    {
+        PlayerControlsViewModel controls = PlayerControls.ViewModel;
+        try
+        {
+            TimeSpan? time = await JumpToTimeDialog.GetTimeAsync(controls.Position, controls.NaturalDuration);
+            if (time is { } value)
+            {
+                controls.JumpToTime(value);
+            }
+        }
+        catch (COMException)
+        {
+            // Only one content dialog can be open at a time, and another one is already showing.
+        }
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -134,6 +369,11 @@ public sealed partial class PlayerPage : Page
     {
         double overshoot = 200;   // extra space for animation
         double edgeLength = Math.Max(e.NewSize.Width, e.NewSize.Height) + overshoot;
+
+        // Sizing a child from the size of its parent feeds layout back into itself, so an unchanged size
+        // must not start another pass.
+        if (Math.Abs(BackgroundArt.Width - edgeLength) < 0.5) return;
+
         BackgroundArt.Width = edgeLength;
         BackgroundArt.Height = edgeLength;
     }
@@ -465,10 +705,8 @@ public sealed partial class PlayerPage : Page
 
     private void LayoutRoot_OnPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.OriginalKey is VirtualKey.Space or VirtualKey.GamepadX &&
-            !KeyboardAcceleratorHelper.IsControlKeyDown &&
-            !KeyboardAcceleratorHelper.IsShiftKeyDown &&
-            !e.KeyStatus.IsMenuKeyDown)
+        // The keyboard play and pause key is a remappable shortcut. The gamepad X button keeps playing and pausing.
+        if (e.OriginalKey is VirtualKey.GamepadX)
         {
             e.Handled = true;
             ViewModel.HandlePlayPauseKeyDown();
@@ -477,52 +715,11 @@ public sealed partial class PlayerPage : Page
 
     private void LayoutRoot_OnPreviewKeyUp(object sender, KeyRoutedEventArgs e)
     {
-        if (e.OriginalKey is VirtualKey.Space or VirtualKey.GamepadX &&
-            !KeyboardAcceleratorHelper.IsControlKeyDown &&
-            !KeyboardAcceleratorHelper.IsShiftKeyDown &&
-            !e.KeyStatus.IsMenuKeyDown)
+        if (e.OriginalKey is VirtualKey.GamepadX)
         {
             e.Handled = true;
             ViewModel.HandlePlayPauseKeyUp();
         }
-    }
-
-    private void ChangeVolumeKeyboardAccelerator_OnInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        ViewModel.HandleVolumeKey(args.KeyboardAccelerator.Key);
-        args.Handled = true;
-    }
-
-    private void SeekKeyboardAccelerator_OnInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        ViewModel.HandleSeekKey(args.KeyboardAccelerator.Key, args.KeyboardAccelerator.Modifiers);
-        args.Handled = true;
-    }
-
-    private void FrameSteppingKeyboardAccelerator_OnInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        ViewModel.HandleFrameSteppingKey(args.KeyboardAccelerator.Key);
-        args.Handled = true;
-    }
-
-    private void PlaybackRateKeyboardAccelerator_OnInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        ViewModel.HandlePlaybackRateToggleKey(args.KeyboardAccelerator.Key, args.KeyboardAccelerator.Modifiers);
-        args.Handled = true;
-    }
-
-    private void WindowResizeKeyboardAccelerator_OnInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        var boundsRect = Window.Current.CoreWindow.Bounds;
-
-        ViewModel.HandleResizeKey(args.KeyboardAccelerator.Key, args.KeyboardAccelerator.Modifiers, new Size(boundsRect.Width, boundsRect.Height));
-        args.Handled = true;
-    }
-
-    private void SeekToPercentageKeyboardAccelerator_OnInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        ViewModel.HandlePercentJumpKey(args.KeyboardAccelerator.Key);
-        args.Handled = true;
     }
 
     private void VideoView_OnDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
@@ -530,22 +727,7 @@ public sealed partial class PlayerPage : Page
         PlayerControls.ViewModel.ToggleFullscreenCommand.Execute(null);
     }
 
-    private void EscapeKeyboardAccelerator_OnInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        switch (ViewModel.ViewMode)
-        {
-            case WindowViewMode.Compact:
-            case WindowViewMode.FullScreen:
-                ViewModel.GoBack();
-                args.Handled = true;
-                break;
-            case WindowViewMode.Default:
-                ViewModel.TryHideControls();
-                args.Handled = true;
-                break;
-        }
-    }
-
+    [DynamicWindowsRuntimeCast(typeof(MediaPlaybackAutoRepeatMode))]
     private string GetMessageText(PlaybackCommandKind kind, object? value)
     {
         return kind switch
@@ -562,9 +744,54 @@ public sealed partial class PlayerPage : Page
                 => Strings.Resources.AspectRatioStatusMessage(ItemLabelHelper.GetValueOrFallback(ResourceNameToResourceStringConverter.FromName(ratio), ratio)),
             PlaybackCommandKind.Scale when value is double scale => Strings.Resources.ScaleStatus($"{scale * 100:0.##}%"),
             PlaybackCommandKind.Subtitle when value is string label => Strings.Resources.SubtitleStatus(label),
+            PlaybackCommandKind.Subtitle when value is PlayerOsdItem track => Strings.Resources.SubtitleStatus(GetItemLabel(track, isChapter: false)),
             PlaybackCommandKind.SubtitleOff => Strings.Resources.SubtitleStatus(Strings.Resources.None),
+            PlaybackCommandKind.NextChapter or PlaybackCommandKind.PreviousChapter when value is PlayerOsdItem chapter
+                => GetItemLabel(chapter, isChapter: true),
+            PlaybackCommandKind.Loop when value is MediaPlaybackAutoRepeatMode repeatMode => Strings.Resources.RepeatMode((long)repeatMode),
+            PlaybackCommandKind.Shuffle when value is bool isShuffled => Strings.Resources.ShuffleMode(isShuffled ? 1L : 0L),
+            PlaybackCommandKind.AudioTrack when value is PlayerOsdItem track => Strings.Resources.AudioTrackStatus(GetItemLabel(track, isChapter: false)),
+            PlaybackCommandKind.AudioDevice when value is string deviceName => Strings.Resources.AudioDeviceStatus(deviceName),
+            PlaybackCommandKind.AudioDelay when value is double delay => Strings.Resources.AudioDelayStatus((int)Math.Round(delay)),
+            PlaybackCommandKind.SubtitleDelay when value is double delay => Strings.Resources.SubtitleDelayStatus((int)Math.Round(delay)),
+            PlaybackCommandKind.SubtitleDelay => Strings.Resources.NoActiveSubtitleStatus,
+            PlaybackCommandKind.SubtitleSync when value is SubtitleSyncStatus status => GetSubtitleSyncText(status),
+            PlaybackCommandKind.Crop when value is string crop
+                => Strings.Resources.CropStatus(ItemLabelHelper.GetValueOrFallback(ResourceNameToResourceStringConverter.FromName(crop), crop)),
+            PlaybackCommandKind.Zoom when value is double zoom => zoom > 0
+                ? Strings.Resources.ZoomStatus($"{(zoom * 100).ToString("0.##", CultureInfo.CurrentCulture)}%")
+                : Strings.Resources.ZoomToFitStatus,
+            PlaybackCommandKind.Deinterlace when value is DeinterlaceStatus status => status switch
+            {
+                { IsEnabled: true } => Strings.Resources.DeinterlaceOnStatus(status.ModeLabel ?? string.Empty),
+                { ModeLabel: { } modeLabel } => Strings.Resources.DeinterlaceOffModeStatus(modeLabel),
+                _ => Strings.Resources.DeinterlaceOffStatus,
+            },
             _ when value is string str => str,
             _ => string.Empty,
+        };
+    }
+
+    private static string GetItemLabel(PlayerOsdItem item, bool isChapter)
+    {
+        if (!string.IsNullOrWhiteSpace(item.Label))
+        {
+            return item.Label;
+        }
+
+        return isChapter ? Strings.Resources.ChapterName(item.Number) : Strings.Resources.TrackIndex(item.Number);
+    }
+
+    private static string GetSubtitleSyncText(SubtitleSyncStatus status)
+    {
+        return status.Step switch
+        {
+            SubtitleSyncStep.AudioBookmarked => Strings.Resources.SubtitleSyncAudioBookmarkedStatus,
+            SubtitleSyncStep.SubtitleBookmarked => Strings.Resources.SubtitleSyncSubtitleBookmarkedStatus,
+            SubtitleSyncStep.MissingBookmarks => Strings.Resources.SubtitleSyncMissingBookmarksStatus,
+            SubtitleSyncStep.Applied => Strings.Resources.SubtitleSyncAppliedStatus(status.CorrectionMilliseconds, status.TotalDelayMilliseconds),
+            SubtitleSyncStep.Reset => Strings.Resources.SubtitleSyncResetStatus,
+            _ => Strings.Resources.NoActiveSubtitleStatus,
         };
     }
 

@@ -1,0 +1,112 @@
+<ContentDialog
+    x:Class="Screenbox.Dialogs.OnlineSubtitleDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:dialogs="using:Screenbox.Dialogs"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:Screenbox.Core.Models"
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+    xmlns:strings="using:Screenbox.Strings"
+    Title="{x:Bind strings:Resources.OnlineSubtitlesTitle}"
+    CloseButtonText="{x:Bind strings:Resources.Close}"
+    Closing="OnClosing"
+    DefaultButton="None"
+    IsPrimaryButtonEnabled="{x:Bind CanDownload(ViewModel.SelectedSubtitle, ViewModel.State), Mode=OneWay}"
+    Opened="OnOpened"
+    PrimaryButtonClick="OnPrimaryButtonClick"
+    PrimaryButtonText="{x:Bind strings:Resources.OnlineSubtitlesDownload}"
+    Style="{StaticResource DefaultContentDialogStyle}"
+    mc:Ignorable="d">
+
+    <Grid MinWidth="440" RowSpacing="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="300" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox
+                x:Name="SearchBox"
+                AutomationProperties.Name="{x:Bind strings:Resources.OnlineSubtitlesSearchPlaceholder}"
+                KeyDown="SearchBox_OnKeyDown"
+                PlaceholderText="{x:Bind strings:Resources.OnlineSubtitlesSearchPlaceholder}"
+                Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            <Button
+                Grid.Column="1"
+                Command="{x:Bind ViewModel.SearchCommand}"
+                Content="{x:Bind strings:Resources.OnlineSubtitlesSearch}" />
+        </Grid>
+
+        <ComboBox
+            Grid.Row="1"
+            MinWidth="240"
+            AutomationProperties.Name="{x:Bind strings:Resources.OnlineSubtitlesLanguage}"
+            Header="{x:Bind strings:Resources.OnlineSubtitlesLanguage}"
+            ItemsSource="{x:Bind ViewModel.Languages}"
+            SelectedItem="{x:Bind ViewModel.SelectedLanguage, Mode=TwoWay}">
+            <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="models:OnlineSubtitleLanguage">
+                    <TextBlock Text="{x:Bind dialogs:OnlineSubtitleDialog.GetLanguageName(Code, LanguageTag, EnglishName)}" />
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+
+        <Grid Grid.Row="2">
+            <ListView
+                AutomationProperties.Name="{x:Bind strings:Resources.OnlineSubtitlesTitle}"
+                DoubleTapped="ResultsListView_OnDoubleTapped"
+                ItemsSource="{x:Bind ViewModel.Results}"
+                KeyDown="ResultsListView_OnKeyDown"
+                SelectedItem="{x:Bind ViewModel.SelectedSubtitle, Mode=TwoWay}"
+                SelectionMode="Single">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="models:OnlineSubtitle">
+                        <StackPanel Padding="0,6">
+                            <TextBlock
+                                Text="{x:Bind FileName}"
+                                TextTrimming="CharacterEllipsis"
+                                ToolTipService.ToolTip="{x:Bind FileName}" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="{x:Bind dialogs:OnlineSubtitleDialog.GetSubtitleDetails(LanguageName, DownloadCount, IsHashMatch, IsHearingImpaired)}"
+                                TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+            <muxc:ProgressRing
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                IsActive="{x:Bind IsBusy(ViewModel.State), Mode=OneWay}" />
+            <TextBlock
+                MaxWidth="360"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="{x:Bind GetEmptyResultsText(ViewModel.State), Mode=OneWay}"
+                TextAlignment="Center"
+                TextWrapping="Wrap" />
+        </Grid>
+
+        <TextBlock
+            Grid.Row="3"
+            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+            Text="{x:Bind GetErrorText(ViewModel.State), Mode=OneWay}"
+            TextWrapping="Wrap" />
+
+        <TextBlock
+            Grid.Row="4"
+            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+            Style="{StaticResource CaptionTextBlockStyle}"
+            Text="{x:Bind strings:Resources.OnlineSubtitlesAttribution}" />
+    </Grid>
+</ContentDialog>

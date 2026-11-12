@@ -1,0 +1,28 @@
+<ContentDialog
+    x:Class="Screenbox.Dialogs.JumpToTimeDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:strings="using:Screenbox.Strings"
+    Title="{x:Bind strings:Resources.GoToTime}"
+    CloseButtonText="{x:Bind strings:Resources.Cancel}"
+    DefaultButton="Primary"
+    IsPrimaryButtonEnabled="{x:Bind CanGo(TimeBox.Text), Mode=OneWay}"
+    Opened="OnOpened"
+    PrimaryButtonText="{x:Bind strings:Resources.GoToTimeButton}"
+    Style="{StaticResource DefaultContentDialogStyle}"
+    mc:Ignorable="d">
+
+    <StackPanel Spacing="8">
+        <TextBox
+            x:Name="TimeBox"
+            AutomationProperties.HelpText="{x:Bind LengthText}"
+            Header="{x:Bind strings:Resources.GoToTimeHeader}"
+            PlaceholderText="0:00:00" />
+        <TextBlock
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            Style="{StaticResource CaptionTextBlockStyle}"
+            Text="{x:Bind LengthText}" />
+    </StackPanel>
+</ContentDialog>

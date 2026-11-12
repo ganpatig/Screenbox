@@ -620,6 +620,56 @@
   <data name="AddSubtitle" xml:space="preserve">
     <value>Add subtitle</value>
   </data>
+  <data name="AddSubtitleFromOnline" xml:space="preserve">
+    <value>Add subtitle from online</value>
+  </data>
+  <data name="OnlineSubtitlesTitle" xml:space="preserve">
+    <value>Online subtitles</value>
+  </data>
+  <data name="OnlineSubtitlesSearchPlaceholder" xml:space="preserve">
+    <value>Movie or episode name</value>
+  </data>
+  <data name="OnlineSubtitlesSearch" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="OnlineSubtitlesLanguage" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="OnlineSubtitlesAllLanguages" xml:space="preserve">
+    <value>All languages</value>
+  </data>
+  <data name="OnlineSubtitlesDownload" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="OnlineSubtitlesNoResults" xml:space="preserve">
+    <value>No subtitles found. Try a shorter name or another language.</value>
+  </data>
+  <data name="OnlineSubtitlesSearchFailed" xml:space="preserve">
+    <value>Couldn't reach OpenSubtitles. Check your internet connection and try again.</value>
+  </data>
+  <data name="OnlineSubtitlesDownloadFailed" xml:space="preserve">
+    <value>Couldn't download this subtitle. Try another one.</value>
+  </data>
+  <data name="OnlineSubtitlesNoMedia" xml:space="preserve">
+    <value>Play a video to search for its subtitles.</value>
+  </data>
+  <data name="OnlineSubtitlesHashMatch" xml:space="preserve">
+    <value>Matches this file</value>
+  </data>
+  <data name="OnlineSubtitlesHearingImpaired" xml:space="preserve">
+    <value>Hearing impaired</value>
+  </data>
+  <data name="OnlineSubtitlesAttribution" xml:space="preserve">
+    <value>Subtitles from OpenSubtitles.org</value>
+  </data>
+  <data name="OnlineSubtitlesDownloadCount_One" xml:space="preserve">
+    <value>{0} download</value>
+    <comment>#Format[Plural Int]</comment>
+  </data>
+  <data name="OnlineSubtitlesDownloadCount_Other" xml:space="preserve">
+    <value>{0} downloads</value>
+    <comment>#Format[Plural Int]</comment>
+  </data>
   <data name="Audio" xml:space="preserve">
     <value>Audio</value>
   </data>
@@ -986,6 +1036,9 @@
   <data name="SettingsShowChaptersHeader" xml:space="preserve">
     <value>Show chapter name when available</value>
   </data>
+  <data name="SettingsShowSeekPreviewHeader" xml:space="preserve">
+    <value>Show video preview when hovering over the seek bar</value>
+  </data>
   <data name="SettingsOnScreenControlsHideDelayHeader" xml:space="preserve">
     <value>Dismiss controls after this amount of time</value>
   </data>
@@ -1162,6 +1215,371 @@
   <data name="AspectRatioStatusMessage" xml:space="preserve">
     <value>Aspect ratio: {0}</value>
     <comment>#Format[String ratio]</comment>
+  </data>
+  <data name="AudioTrackStatus" xml:space="preserve">
+    <value>Audio track: {0}</value>
+    <comment>#Format[String name]</comment>
+  </data>
+  <data name="AudioDeviceStatus" xml:space="preserve">
+    <value>Audio device: {0}</value>
+    <comment>#Format[String name]</comment>
+  </data>
+  <data name="AudioDelayStatus" xml:space="preserve">
+    <value>Audio delay: {0} ms</value>
+    <comment>#Format[Int delay]</comment>
+  </data>
+  <data name="SubtitleDelayStatus" xml:space="preserve">
+    <value>Subtitle delay: {0} ms</value>
+    <comment>#Format[Int delay]</comment>
+  </data>
+  <data name="NoActiveSubtitleStatus" xml:space="preserve">
+    <value>No subtitle is turned on</value>
+  </data>
+  <data name="SubtitleSyncAudioBookmarkedStatus" xml:space="preserve">
+    <value>Subtitle sync: audio time bookmarked</value>
+  </data>
+  <data name="SubtitleSyncSubtitleBookmarkedStatus" xml:space="preserve">
+    <value>Subtitle sync: subtitle time bookmarked</value>
+  </data>
+  <data name="SubtitleSyncMissingBookmarksStatus" xml:space="preserve">
+    <value>Subtitle sync: bookmark the audio and the subtitle first</value>
+  </data>
+  <data name="SubtitleSyncAppliedStatus" xml:space="preserve">
+    <value>Subtitle sync: corrected by {0} ms (total delay {1} ms)</value>
+    <comment>#Format[Int correction, Int totalDelay]</comment>
+  </data>
+  <data name="SubtitleSyncResetStatus" xml:space="preserve">
+    <value>Subtitle sync: delay reset</value>
+  </data>
+  <data name="CropStatus" xml:space="preserve">
+    <value>Crop: {0}</value>
+    <comment>#Format[String crop]</comment>
+  </data>
+  <data name="ZoomStatus" xml:space="preserve">
+    <value>Zoom: {0}</value>
+    <comment>#Format[String zoom]</comment>
+  </data>
+  <data name="ZoomToFitStatus" xml:space="preserve">
+    <value>Zoom: fit to window</value>
+  </data>
+  <data name="DeinterlaceOnStatus" xml:space="preserve">
+    <value>Deinterlace on ({0})</value>
+    <comment>#Format[String mode]</comment>
+  </data>
+  <data name="DeinterlaceOffModeStatus" xml:space="preserve">
+    <value>Deinterlace off ({0})</value>
+    <comment>#Format[String mode]</comment>
+  </data>
+  <data name="DeinterlaceOffStatus" xml:space="preserve">
+    <value>Deinterlace off</value>
+  </data>
+  <data name="GoToTime" xml:space="preserve">
+    <value>Go to time</value>
+  </data>
+  <data name="GoToTimeButton" xml:space="preserve">
+    <value>Go</value>
+  </data>
+  <data name="GoToTimeHeader" xml:space="preserve">
+    <value>Time (hours:minutes:seconds)</value>
+  </data>
+  <data name="GoToTimeLength" xml:space="preserve">
+    <value>Length: {0}</value>
+    <comment>#Format[String length]</comment>
+  </data>
+  <data name="KeyboardShortcuts" xml:space="preserve">
+    <value>Keyboard shortcuts</value>
+  </data>
+  <data name="ViewKeyboardShortcuts" xml:space="preserve">
+    <value>Customize</value>
+  </data>
+  <data name="SettingsKeyboardShortcutsDescription" xml:space="preserve">
+    <value>Use the keyboard shortcuts of VLC media player, or assign your own keys. Press F1 to open the list at any time.</value>
+  </data>
+  <data name="ShortcutsPlaybackHeader" xml:space="preserve">
+    <value>Playback</value>
+  </data>
+  <data name="ShortcutsJumpHeader" xml:space="preserve">
+    <value>Jumping</value>
+  </data>
+  <data name="ShortcutsAudioHeader" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="ShortcutsSubtitlesHeader" xml:space="preserve">
+    <value>Subtitles</value>
+  </data>
+  <data name="ShortcutsVideoHeader" xml:space="preserve">
+    <value>Video</value>
+  </data>
+  <data name="ShortcutsInterfaceHeader" xml:space="preserve">
+    <value>Window and menus</value>
+  </data>
+  <data name="ShortcutsUnsupportedNote" xml:space="preserve">
+    <value>Not available from VLC: recording, wallpaper mode, bookmarks, disc menus, 360° video, TV programs and subtitle text size. Ctrl+Q, Ctrl+P, Ctrl+H and Ctrl+F open pages of the library.</value>
+  </data>
+  <data name="HotkeyPlayPause" xml:space="preserve">
+    <value>Play or pause (hold to play at double speed)</value>
+  </data>
+  <data name="HotkeyPlay" xml:space="preserve">
+    <value>Play</value>
+  </data>
+  <data name="HotkeyPause" xml:space="preserve">
+    <value>Pause</value>
+  </data>
+  <data name="HotkeyStop" xml:space="preserve">
+    <value>Stop</value>
+  </data>
+  <data name="HotkeyNext" xml:space="preserve">
+    <value>Next item</value>
+  </data>
+  <data name="HotkeyPrevious" xml:space="preserve">
+    <value>Previous item</value>
+  </data>
+  <data name="HotkeyNextChapter" xml:space="preserve">
+    <value>Next chapter</value>
+  </data>
+  <data name="HotkeyPreviousChapter" xml:space="preserve">
+    <value>Previous chapter</value>
+  </data>
+  <data name="HotkeyFaster" xml:space="preserve">
+    <value>Faster (1.5×, 2×, 3×, 4×, 8×…)</value>
+  </data>
+  <data name="HotkeySlower" xml:space="preserve">
+    <value>Slower (0.67×, 0.5×, 0.33×, 0.25×…)</value>
+  </data>
+  <data name="HotkeyNormalRate" xml:space="preserve">
+    <value>Normal speed</value>
+  </data>
+  <data name="HotkeyFasterFine" xml:space="preserve">
+    <value>Faster by 0.1×</value>
+  </data>
+  <data name="HotkeySlowerFine" xml:space="preserve">
+    <value>Slower by 0.1×</value>
+  </data>
+  <data name="HotkeyFasterStep" xml:space="preserve">
+    <value>Faster by 0.25×</value>
+  </data>
+  <data name="HotkeySlowerStep" xml:space="preserve">
+    <value>Slower by 0.25×</value>
+  </data>
+  <data name="HotkeyNextFrame" xml:space="preserve">
+    <value>Next frame</value>
+  </data>
+  <data name="HotkeyPreviousFrame" xml:space="preserve">
+    <value>Previous frame, while paused</value>
+  </data>
+  <data name="HotkeyShowPosition" xml:space="preserve">
+    <value>Show the current time</value>
+  </data>
+  <data name="HotkeyJumpToTime" xml:space="preserve">
+    <value>Go to a time</value>
+  </data>
+  <data name="HotkeyCycleLoop" xml:space="preserve">
+    <value>Repeat: off, all or one</value>
+  </data>
+  <data name="HotkeyToggleRandom" xml:space="preserve">
+    <value>Shuffle on or off</value>
+  </data>
+  <data name="HotkeyClearPlayQueue" xml:space="preserve">
+    <value>Clear the play queue</value>
+  </data>
+  <data name="HotkeyJumpBackwardSeconds" xml:space="preserve">
+    <value>Jump back {0} seconds</value>
+    <comment>#Format[Int seconds]</comment>
+  </data>
+  <data name="HotkeyJumpForwardSeconds" xml:space="preserve">
+    <value>Jump forward {0} seconds</value>
+    <comment>#Format[Int seconds]</comment>
+  </data>
+  <data name="HotkeyJumpBackwardMinutes_One" xml:space="preserve">
+    <value>Jump back {0} minute</value>
+    <comment>#Format[Plural Int]</comment>
+  </data>
+  <data name="HotkeyJumpBackwardMinutes_Other" xml:space="preserve">
+    <value>Jump back {0} minutes</value>
+    <comment>#Format[Plural Int]</comment>
+  </data>
+  <data name="HotkeyJumpForwardMinutes_One" xml:space="preserve">
+    <value>Jump forward {0} minute</value>
+    <comment>#Format[Plural Int]</comment>
+  </data>
+  <data name="HotkeyJumpForwardMinutes_Other" xml:space="preserve">
+    <value>Jump forward {0} minutes</value>
+    <comment>#Format[Plural Int]</comment>
+  </data>
+  <data name="HotkeyJumpToStart" xml:space="preserve">
+    <value>Go to the start</value>
+  </data>
+  <data name="HotkeyJumpToEnd" xml:space="preserve">
+    <value>Go to the end</value>
+  </data>
+  <data name="HotkeyJumpToPercent" xml:space="preserve">
+    <value>Go to {0}% of the media</value>
+    <comment>#Format[Int percent]</comment>
+  </data>
+  <data name="HotkeyVolumeUp" xml:space="preserve">
+    <value>Volume up by 5%</value>
+  </data>
+  <data name="HotkeyVolumeDown" xml:space="preserve">
+    <value>Volume down by 5%</value>
+  </data>
+  <data name="HotkeyToggleMute" xml:space="preserve">
+    <value>Mute or unmute</value>
+  </data>
+  <data name="HotkeyCycleAudioTrack" xml:space="preserve">
+    <value>Next audio track</value>
+  </data>
+  <data name="HotkeyCycleAudioDevice" xml:space="preserve">
+    <value>Next audio device</value>
+  </data>
+  <data name="HotkeyAudioDelayUp" xml:space="preserve">
+    <value>Audio delay +50 ms</value>
+  </data>
+  <data name="HotkeyAudioDelayDown" xml:space="preserve">
+    <value>Audio delay -50 ms</value>
+  </data>
+  <data name="HotkeyCycleSubtitleTrack" xml:space="preserve">
+    <value>Next subtitle track</value>
+  </data>
+  <data name="HotkeyCycleSubtitleTrackReverse" xml:space="preserve">
+    <value>Previous subtitle track</value>
+  </data>
+  <data name="HotkeyToggleSubtitles" xml:space="preserve">
+    <value>Subtitles on or off</value>
+  </data>
+  <data name="HotkeySubtitleDelayUp" xml:space="preserve">
+    <value>Subtitle delay +50 ms (show later)</value>
+  </data>
+  <data name="HotkeySubtitleDelayDown" xml:space="preserve">
+    <value>Subtitle delay -50 ms (show earlier)</value>
+  </data>
+  <data name="HotkeySubtitleSyncBookmarkAudio" xml:space="preserve">
+    <value>Subtitle sync: mark when you hear a line</value>
+  </data>
+  <data name="HotkeySubtitleSyncBookmarkSubtitle" xml:space="preserve">
+    <value>Subtitle sync: mark when its subtitle appears</value>
+  </data>
+  <data name="HotkeySubtitleSyncApply" xml:space="preserve">
+    <value>Subtitle sync: correct the delay</value>
+  </data>
+  <data name="HotkeySubtitleSyncReset" xml:space="preserve">
+    <value>Subtitle sync: reset the delay</value>
+  </data>
+  <data name="HotkeyToggleFullscreen" xml:space="preserve">
+    <value>Full screen on or off</value>
+  </data>
+  <data name="HotkeyExitFullscreen" xml:space="preserve">
+    <value>Exit full screen, or hide the controls</value>
+  </data>
+  <data name="HotkeyCycleAspectRatio" xml:space="preserve">
+    <value>Next aspect ratio (stretches the video)</value>
+  </data>
+  <data name="HotkeyCycleCrop" xml:space="preserve">
+    <value>Next crop (Fit, Fill, 16:9…)</value>
+  </data>
+  <data name="HotkeyToggleAutoscale" xml:space="preserve">
+    <value>Original size or fit to window</value>
+  </data>
+  <data name="HotkeyScaleUp" xml:space="preserve">
+    <value>Zoom in by 10%</value>
+  </data>
+  <data name="HotkeyScaleDown" xml:space="preserve">
+    <value>Zoom out by 10%</value>
+  </data>
+  <data name="HotkeyNextZoomMode" xml:space="preserve">
+    <value>Next zoom (25%, 50%, 100%, 200%)</value>
+  </data>
+  <data name="HotkeyPreviousZoomMode" xml:space="preserve">
+    <value>Previous zoom</value>
+  </data>
+  <data name="HotkeyZoomTo" xml:space="preserve">
+    <value>Zoom to {0}</value>
+    <comment>#Format[String zoom]</comment>
+  </data>
+  <data name="HotkeyToggleDeinterlace" xml:space="preserve">
+    <value>Deinterlace on or off</value>
+  </data>
+  <data name="HotkeyCycleDeinterlaceMode" xml:space="preserve">
+    <value>Next deinterlace mode</value>
+  </data>
+  <data name="HotkeySaveFrame" xml:space="preserve">
+    <value>Save the current frame</value>
+  </data>
+  <data name="HotkeyShowControls" xml:space="preserve">
+    <value>Show the controls</value>
+  </data>
+  <data name="HotkeyShowContextMenu" xml:space="preserve">
+    <value>Open the player menu</value>
+  </data>
+  <data name="HotkeyShowPlayQueue" xml:space="preserve">
+    <value>Show the play queue</value>
+  </data>
+  <data name="HotkeyOpenFiles" xml:space="preserve">
+    <value>Open files</value>
+  </data>
+  <data name="HotkeyShowMediaInfo" xml:space="preserve">
+    <value>Media information</value>
+  </data>
+  <data name="HotkeyToggleCompactOverlay" xml:space="preserve">
+    <value>Compact overlay on or off</value>
+  </data>
+  <data name="HotkeyCast" xml:space="preserve">
+    <value>Cast to a device</value>
+  </data>
+  <data name="HotkeyResizeWindowTo" xml:space="preserve">
+    <value>Resize the window to {0} of the video</value>
+    <comment>#Format[String size]</comment>
+  </data>
+  <data name="HotkeyResizeWindowToScreen" xml:space="preserve">
+    <value>Resize the window to fill the screen</value>
+  </data>
+  <data name="HotkeyGrowWindow" xml:space="preserve">
+    <value>Make the window larger</value>
+  </data>
+  <data name="HotkeyShrinkWindow" xml:space="preserve">
+    <value>Make the window smaller</value>
+  </data>
+  <data name="HotkeyShowKeyboardShortcuts" xml:space="preserve">
+    <value>Keyboard shortcuts</value>
+  </data>
+  <data name="HotkeyChange" xml:space="preserve">
+    <value>Change</value>
+  </data>
+  <data name="HotkeyChangeDescription" xml:space="preserve">
+    <value>Change the keys for {0}</value>
+    <comment>#Format[String action]</comment>
+  </data>
+  <data name="HotkeyPressKeys" xml:space="preserve">
+    <value>Press the new key or key combination.</value>
+  </data>
+  <data name="HotkeyWaitingForKeys" xml:space="preserve">
+    <value>Waiting for keys…</value>
+  </data>
+  <data name="HotkeySelectToRecord" xml:space="preserve">
+    <value>Select here, then press the keys</value>
+  </data>  <data name="HotkeySet" xml:space="preserve">
+    <value>Set</value>
+  </data>
+  <data name="HotkeyAdd" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="HotkeyRemove" xml:space="preserve">
+    <value>Remove keys</value>
+  </data>
+  <data name="HotkeyReset" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="HotkeyConflictWarning" xml:space="preserve">
+    <value>{0} is used for “{1}”. Assigning it here removes it from there.</value>
+    <comment>#Format[String keys, String action]</comment>
+  </data>
+  <data name="HotkeyEditorHint" xml:space="preserve">
+    <value>Select Change next to a shortcut to assign different keys. Set replaces the keys, and Add keeps the existing keys as well.</value>
+  </data>
+  <data name="HotkeyResetAll" xml:space="preserve">
+    <value>Reset all shortcuts</value>
+  </data>
+  <data name="HotkeyResetAllConfirmation" xml:space="preserve">
+    <value>Reset every shortcut to its default keys?</value>
   </data>
 </root>
 

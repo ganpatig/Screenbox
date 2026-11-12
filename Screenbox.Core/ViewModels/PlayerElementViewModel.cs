@@ -210,6 +210,13 @@ public sealed partial class PlayerElementViewModel : ObservableRecipient,
 
     public void UpdatePlayerViewSize(Size size)
     {
+        // The view reports its size on every layout pass. Only a real change is worth acting on, because
+        // the crop that follows reconfigures the video output, which sizes the view again.
+        if (Math.Abs(size.Width - _viewSize.Width) < 0.5 && Math.Abs(size.Height - _viewSize.Height) < 0.5)
+        {
+            return;
+        }
+
         _viewSize = size;
         SetCropGeometry(_aspectRatio);
 

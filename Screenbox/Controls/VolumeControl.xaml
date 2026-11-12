@@ -56,9 +56,6 @@
                 d:Glyph="&#xE994;"
                 Glyph="{x:Bind converters:GlyphConverter.ToVolumeGlyph(ViewModel.IsMute, ViewModel.Volume), Mode=OneWay}"
                 MirroredWhenRightToLeft="True" />
-            <ToggleButton.KeyboardAccelerators>
-                <KeyboardAccelerator Key="M" />
-            </ToggleButton.KeyboardAccelerators>
         </ToggleButton>
 
         <Border

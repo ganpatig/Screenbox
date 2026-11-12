@@ -175,11 +175,52 @@ public sealed class VlcMediaPlayer : IMediaPlayer
         }
     }
 
+    /// <summary>
+    /// Gets or sets the display aspect ratio that the video is stretched to.
+    /// </summary>
+    /// <remarks>
+    /// The value applies to the player rather than the media, so it stays in effect for the next media
+    /// until it is reset. It is independent of <see cref="NormalizedSourceRect"/>, which crops the video.
+    /// </remarks>
+    /// <value>The aspect ratio in <c>num:den</c> form, such as <c>16:9</c>, or <see langword="null"/> to use the aspect ratio of the video.</value>
+    public string? AspectRatio
+    {
+        get => VlcPlayer.AspectRatio;
+        set => VlcPlayer.AspectRatio = string.IsNullOrEmpty(value) ? null : value;
+    }
+
+    /// <summary>
+    /// Gets or sets the scale at which the video is drawn.
+    /// </summary>
+    /// <value><c>0</c> to fit the video to the view, or a factor of the original video size, such as <c>1</c> or <c>0.5</c>.</value>
+    public double VideoScale
+    {
+        get => VlcPlayer.Scale;
+        set => VlcPlayer.Scale = (float)value;
+    }
+
+    /// <summary>
+    /// Turns deinterlacing on with the specified mode, or turns it off.
+    /// </summary>
+    /// <param name="mode">A LibVLC deinterlace mode, such as <c>blend</c> or <c>yadif</c>, or <see langword="null"/> to turn deinterlacing off.</param>
+    public void SetDeinterlace(string? mode)
+    {
+        VlcPlayer.SetDeinterlace(mode);
+    }
+
     public Rect NormalizedSourceRect
     {
         get => _normalizedSourceRect;
         set
         {
+            // Writing the crop to the player reconfigures its video output, which resizes the view it draws
+            // into. A view size change asks for the crop again, so writing an unchanged crop can keep the
+            // layout of the page going round until XAML gives up on it.
+            if (value == _normalizedSourceRect)
+            {
+                return;
+            }
+
             if (value == _defaultSourceRect)
             {
                 _normalizedSourceRect = _defaultSourceRect;

@@ -182,7 +182,7 @@ public static partial class GlyphConverter
     /// <returns>A glyph code representing the playback command.</returns>
     public static string ToOsdBadgeGlyph(PlaybackCommandKind kind, object? value)
     {
-        //const string StopSolidGlyph = "\uEE95";
+        const string StopSolidGlyph = "\uEE95";
         const string ChevronLeftMedGlyph = "\uE973";
         const string ChevronRightMedGlyph = "\uE974";
         const string RewindGlyph = "\uE628";
@@ -192,7 +192,7 @@ public static partial class GlyphConverter
         {
             PlaybackCommandKind.Play => PlaySolidGlyph,
             PlaybackCommandKind.Pause => PauseSolidGlyph,
-            //PlaybackCommandKind.Stop => StopSolidGlyph,
+            PlaybackCommandKind.Stop => StopSolidGlyph,
             PlaybackCommandKind.Rewind => ChevronLeftMedGlyph,
             PlaybackCommandKind.FastForward => ChevronRightMedGlyph,
             PlaybackCommandKind.Volume when value is int volume => ToVolumeGlyph(isMute: false, volume),

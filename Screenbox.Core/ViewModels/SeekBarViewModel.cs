@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using CommunityToolkit.Mvvm.Messaging.Messages;
 using CommunityToolkit.WinUI;
 using Screenbox.Core.Contexts;
+using Screenbox.Core.Coordinators;
 using Screenbox.Core.Enums;
 using Screenbox.Core.Events;
 using Screenbox.Core.Helpers;
@@ -26,6 +27,7 @@ public sealed partial class SeekBarViewModel :
     IRecipient<ChangeTimeRequestMessage>,
     IRecipient<PlayerControlsVisibilityChangedMessage>,
     IRecipient<QueueCurrentItemChangedMessage>,
+    IRecipient<SettingsChangedMessage>,
     IRecipient<PropertyChangedMessage<PlayerVisibilityState>>,
     IRecipient<PropertyChangedMessage<IMediaPlayer?>>
 {
@@ -44,6 +46,17 @@ public sealed partial class SeekBarViewModel :
     [ObservableProperty] public partial bool ShouldHandleKeyDown { get; set; }
 
     [ObservableProperty] public partial ChapterCue? CurrentChapterCue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the most recently decoded seek preview frame.
+    /// </summary>
+    /// <value>The decoded frame, or <see langword="null"/> if no frame is available for the playing media.</value>
+    [ObservableProperty] public partial SeekPreviewFrame? PreviewFrame { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value that indicates whether the seek preview shows the video frame at the hovered position.
+    /// </summary>
+    [ObservableProperty] public partial bool IsSeekPreviewEnabled { get; set; }
 
     public ObservableCollection<ChapterCue> Chapters { get; }
 
@@ -64,25 +77,45 @@ public sealed partial class SeekBarViewModel :
     private readonly DispatcherQueueTimer _seekTimer;
     private readonly DispatcherQueueTimer _originalPositionTimer;
     private readonly IPlaybackProgressTracker _playbackProgressTracker;
+    private readonly ISeekPreviewCoordinator _seekPreviewCoordinator;
+    private readonly DispatcherQueueTimer _previewTimer;
     private TimeSpan _originalPosition;
     private TimeSpan _lastTrackedPosition;
     private bool? _seekDirection;
     private bool _timeChangeOverride;
     private MediaViewModel? _currentItem;
+    private int _previewFrameVersion;
+    private double _shownPreviewTime;
+    private SeekPreviewQuality _shownPreviewQuality;
+
+    /// <summary>
+    /// How long the hovered position has to stay still before the frame at exactly that position is decoded.
+    /// </summary>
+    private static readonly TimeSpan ExactPreviewDelay = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>
+    /// How far a fast preview frame may be from the hovered position before it is too old to show. It matches
+    /// the span of positions that share one keyframe preview.
+    /// </summary>
+    private const double FastPreviewToleranceMilliseconds = 1000;
 
     public SeekBarViewModel(ISettingsService settingsService, IPlaybackProgressTracker playbackProgressTracker,
-        PlayerContext playerContext)
+        PlayerContext playerContext, ISeekPreviewCoordinator seekPreviewCoordinator)
     {
         _settingsService = settingsService;
         _playbackProgressTracker = playbackProgressTracker;
         _playerContext = playerContext;
+        _seekPreviewCoordinator = seekPreviewCoordinator;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _bufferingTimer = _dispatcherQueue.CreateTimer();
         _seekTimer = _dispatcherQueue.CreateTimer();
         _originalPositionTimer = _dispatcherQueue.CreateTimer();
         _originalPositionTimer.IsRepeating = false;
+        _previewTimer = _dispatcherQueue.CreateTimer();
+        _previewTimer.IsRepeating = false;
         ShouldShowPreview = true;
         ShouldHandleKeyDown = true;
+        IsSeekPreviewEnabled = settingsService.PlayerShowSeekPreview;
         Chapters = new ObservableCollection<ChapterCue>();
 
         if (MediaPlayer != null)
@@ -102,8 +135,17 @@ public sealed partial class SeekBarViewModel :
         Messenger.Register<ChangeTimeRequestMessage>(this);
         Messenger.Register<PlayerControlsVisibilityChangedMessage>(this);
         Messenger.Register<QueueCurrentItemChangedMessage>(this);
+        Messenger.Register<SettingsChangedMessage>(this);
         Messenger.Register<PropertyChangedMessage<PlayerVisibilityState>>(this);
         Messenger.Register<PropertyChangedMessage<IMediaPlayer?>>(this);
+    }
+
+    public void Receive(SettingsChangedMessage message)
+    {
+        if (message.SettingsName == nameof(SettingsPageViewModel.PlayerShowSeekPreview))
+        {
+            IsSeekPreviewEnabled = _settingsService.PlayerShowSeekPreview;
+        }
     }
 
     public void Receive(QueueCurrentItemChangedMessage message)
@@ -189,6 +231,13 @@ public sealed partial class SeekBarViewModel :
     {
         normalizedPosition = Math.Clamp(normalizedPosition, 0, 1);
         PreviewTime = (long)(normalizedPosition * Length);
+
+        // A keyframe decodes quickly enough to follow the pointer, so it keeps the preview moving while scrubbing.
+        RequestPreviewFrame(SeekPreviewQuality.Fast);
+
+        // The frame at exactly this position can take seconds to decode, so it is only decoded once the
+        // user settles on a position.
+        _previewTimer.Debounce(() => RequestPreviewFrame(SeekPreviewQuality.Exact), ExactPreviewDelay);
     }
 
     /// <summary>
@@ -365,6 +414,7 @@ public sealed partial class SeekBarViewModel :
                 Time = 0;
                 CurrentChapterCue = null;
                 Chapters.Clear();
+                ClearPreviewFrame();
             });
         }
         else
@@ -374,7 +424,68 @@ public sealed partial class SeekBarViewModel :
                 Time = 0;
                 CurrentChapterCue = null;
                 Chapters.Clear();
+                ClearPreviewFrame();
             });
+        }
+    }
+
+    /// <summary>
+    /// Requests the video frame at <see cref="PreviewTime"/> and shows it once it has been decoded.
+    /// </summary>
+    /// <param name="quality">How closely the frame has to match the hovered position.</param>
+    private async void RequestPreviewFrame(SeekPreviewQuality quality)
+    {
+        if (!IsSeekPreviewEnabled || !IsSeekable || Length <= 0) return;
+
+        int version = _previewFrameVersion;
+        SeekPreviewFrame? frame =
+            await _seekPreviewCoordinator.GetFrameAsync(TimeSpan.FromMilliseconds(PreviewTime), quality);
+
+        // Discard frames of media that was replaced, or previews that were disabled, while the frame was decoding.
+        if (frame is null || version != _previewFrameVersion || !IsSeekPreviewEnabled) return;
+
+        // Frames do not arrive in the order they were requested. Showing one for a position that the pointer
+        // has already left makes the preview run through old frames on its way to the current one.
+        double tolerance = quality is SeekPreviewQuality.Exact ? 0 : FastPreviewToleranceMilliseconds;
+        if (Math.Abs(frame.Position.TotalMilliseconds - PreviewTime) > tolerance) return;
+
+        // A keyframe must not replace the exact frame of the position that is being hovered.
+        if (quality is SeekPreviewQuality.Fast && _shownPreviewQuality is SeekPreviewQuality.Exact &&
+            Math.Abs(_shownPreviewTime - PreviewTime) <= tolerance) return;
+
+        _shownPreviewTime = frame.Position.TotalMilliseconds;
+        _shownPreviewQuality = quality;
+        PreviewFrame = frame;
+    }
+
+    /// <summary>
+    /// Removes the current preview frame and invalidates frames that are still being decoded.
+    /// </summary>
+    private void ClearPreviewFrame()
+    {
+        _previewFrameVersion++;
+        _previewTimer.Stop();
+        _shownPreviewQuality = SeekPreviewQuality.Fast;
+        _shownPreviewTime = 0;
+        PreviewFrame = null;
+    }
+
+    partial void OnIsSeekPreviewEnabledChanged(bool value)
+    {
+        if (!value)
+        {
+            ClearPreviewFrame();
+        }
+    }
+
+    partial void OnShouldShowPreviewChanged(bool value)
+    {
+        // Stop decoding positions the user is no longer looking at. A frame already being decoded still
+        // completes and is cached for the next hover.
+        if (!value)
+        {
+            _previewTimer.Stop();
+            _seekPreviewCoordinator.CancelPendingRequest();
         }
     }
 

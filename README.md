@@ -17,6 +17,26 @@
   </a>
 </p>
 
+> [!NOTE]
+> **This is a fork** of [Screenbox](https://github.com/huynhsontung/Screenbox) by Tung H. that makes the player behave more like VLC. The Store link above installs the original app, not this fork.
+
+## What this fork adds
+
+- **VLC keyboard shortcuts.** The VLC 3.0 hotkey set: speed (`+` faster, `-` slower, `=` normal, `[` `]` fine steps), jumps of 3 s, 10 s, 1 min and 5 min, frame stepping, audio and subtitle delay, subtitle sync, aspect ratio, crop, zoom, deinterlace and more. Press `F1` in the player, or open Settings › Player › Keyboard shortcuts, to see them all and **reassign any key**.
+- **200% volume**, as in VLC, and 10-second rewind and fast-forward steps by default.
+- **Frame-accurate seek bar previews.** While you drag, the nearest keyframe follows the pointer; when you stop, the exact frame at that position replaces it.
+- **Online subtitles.** Search OpenSubtitles from the audio and subtitle menu and add a subtitle without leaving the player, in the spirit of VLC's VLSub.
+- **Remembered tracks.** Each video reopens with the audio and subtitle tracks you last chose for it. A video you have not played before starts with English audio when it has an English track.
+- **Bigger picture-in-picture.** Picture-in-picture opens as large as Windows allows and remembers the size you drag it to.
+- **Go to time** (`Ctrl+T`) and **Settings** in the player's ⋯ menu.
+- **Fixes** for crashes when opening a video from the Recent list, caused by the volume and chapter bars resizing in a loop.
+
+New text in this fork is in English only; other languages show it in English until it is translated.
+
+To use this fork, build it from source as described under [Quick Start for Developers](#quick-start-for-developers).
+
+## About Screenbox
+
 Screenbox is a modern video player that cares about performance and ease of use on a wide range of device types. It features a beautiful, friendly user interface that is fast and lightweight. Screenbox is available on Windows 10 version 1903 and up, Windows 11, and Xbox consoles.
 
 Screenbox is built on top of [LibVLCSharp](https://github.com/videolan/libvlcsharp) and the Universal Windows Platform (UWP).
@@ -62,7 +82,7 @@ Feel free to open an issue if you want to report a bug, give feedback, or ask a 
 ### Quick Start for Developers
 
 1. **Prerequisites**: Visual Studio 2026 with UWP development workload
-2. **Clone**: `git clone https://github.com/huynhsontung/Screenbox.git`
+2. **Clone**: `git clone https://github.com/ganpatig/Screenbox.git` (this fork) or `git clone https://github.com/huynhsontung/Screenbox.git` (the original)
 3. **Build**: Open `Screenbox.slnx` and build the solution (Ctrl+Shift+B)
 4. **Run**: Set platform to x64 and start debugging (F5)
 

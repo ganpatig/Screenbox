@@ -1,17 +1,23 @@
 using System;
 using System.ComponentModel;
 using System.Numerics;
+using System.Runtime.InteropServices.WindowsRuntime;
 using CommunityToolkit.Mvvm.DependencyInjection;
 using CommunityToolkit.WinUI;
 using Screenbox.Core;
+using Screenbox.Core.Models;
 using Screenbox.Core.ViewModels;
 using Windows.Foundation;
 using Windows.System;
 using Windows.UI.Input;
 using Windows.UI.Xaml;
+using Windows.UI.Xaml.Automation;
+using Windows.UI.Xaml.Automation.Peers;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Input;
+using Windows.UI.Xaml.Media;
+using Windows.UI.Xaml.Media.Imaging;
 
 // The User Control item template is documented at https://go.microsoft.com/fwlink/?LinkId=234236
 
@@ -32,10 +38,20 @@ public sealed partial class SeekBar : UserControl
     }
 
     internal SeekBarViewModel ViewModel => (SeekBarViewModel)DataContext;
+
+    private const double PreviewThumbnailMaxWidth = 192;
+    private const double PreviewThumbnailMaxHeight = 108;
+    private static readonly Thickness TimePreviewPadding = new(8, 3, 8, 5);
+    private static readonly Thickness ThumbnailPreviewPadding = new(4, 4, 4, 5);
+
     private readonly DispatcherQueueTimer _previewToolTipTimer;
     private Thumb? _seekBarThumb;
 
     private readonly ToolTip _previewToolTip;
+    private readonly TextBlock _previewTimeText;
+    private readonly Border _previewThumbnail;
+    private readonly ImageBrush _previewThumbnailBrush;
+    private WriteableBitmap? _previewThumbnailBitmap;
 
     public SeekBar()
     {
@@ -44,16 +60,46 @@ public sealed partial class SeekBar : UserControl
         RegisterSeekBarPointerHandlers();
         DispatcherQueue dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _previewToolTipTimer = dispatcherQueue.CreateTimer();
-        _previewToolTip = new ToolTip { Padding = new Thickness(8, 3, 8, 5), FontSize = 15, VerticalOffset = 13 };
+
+        // An image brush is clipped by the corner radius, which a child Image element would not be.
+        _previewThumbnailBrush = new ImageBrush { Stretch = Stretch.UniformToFill };
+        _previewThumbnail = new Border
+        {
+            Background = _previewThumbnailBrush,
+            CornerRadius = new CornerRadius(4),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 4),
+            Visibility = Visibility.Collapsed
+        };
+
+        // The thumbnail is decorative. The time text already describes the previewed position.
+        AutomationProperties.SetAccessibilityView(_previewThumbnail, AccessibilityView.Raw);
+        _previewTimeText = new TextBlock { HorizontalAlignment = HorizontalAlignment.Center };
+
+        StackPanel previewContent = new();
+        previewContent.Children.Add(_previewThumbnail);
+        previewContent.Children.Add(_previewTimeText);
+        _previewToolTip = new ToolTip
+        {
+            Content = previewContent,
+            Padding = TimePreviewPadding,
+            FontSize = 15,
+            VerticalOffset = 13
+        };
 
         ViewModel.PropertyChanged += ViewModelOnPropertyChanged;
     }
 
     private void ViewModelOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ViewModel.ShouldShowPreview) && !ViewModel.ShouldShowPreview)
+        switch (e.PropertyName)
         {
-            ResetPreviewToolTip();
+            case nameof(ViewModel.ShouldShowPreview) when !ViewModel.ShouldShowPreview:
+                ResetPreviewToolTip();
+                break;
+            case nameof(ViewModel.PreviewFrame):
+                ShowPreviewFrame(ViewModel.PreviewFrame);
+                break;
         }
     }
 
@@ -91,6 +137,7 @@ public sealed partial class SeekBar : UserControl
     {
         if (ToolTipService.GetToolTip(SeekBarSlider) is not ToolTip)
         {
+            _previewToolTip.PlacementRect = new Rect(new Point(0, 0), SeekBarSlider.RenderSize);
             ToolTipService.SetToolTip(SeekBarSlider, _previewToolTip);
         }
 
@@ -108,7 +155,12 @@ public sealed partial class SeekBar : UserControl
 
     private void SeekBarSlider_OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        _previewToolTip.PlacementRect = new Rect(new Point(0, 0), e.NewSize);
+        // Only while the preview is on screen. Placing a popup from a size change runs layout again, and the
+        // seek bar changes size throughout the animation that opens the player.
+        if (_previewToolTip.IsOpen)
+        {
+            _previewToolTip.PlacementRect = new Rect(new Point(0, 0), e.NewSize);
+        }
     }
 
     private void SeekBarSlider_OnLoaded(object sender, RoutedEventArgs e)
@@ -160,6 +212,59 @@ public sealed partial class SeekBar : UserControl
 
         double normalizedPosition = (pointerOffset + thumbOffset) / SeekBarSlider.ActualWidth;
         ViewModel.UpdatePreviewTime(normalizedPosition);
-        _previewToolTip.Content = Humanizer.ToDuration(ViewModel.PreviewTime);
+        _previewTimeText.Text = Humanizer.ToDuration(ViewModel.PreviewTime);
+    }
+
+    /// <summary>
+    /// Shows a decoded frame above the preview time, or hides the thumbnail when there is no frame.
+    /// </summary>
+    /// <remarks>
+    /// Frames are written into a reused <see cref="WriteableBitmap"/>. XAML keeps rendering from the image it was
+    /// given, so releasing a per-frame bitmap after handing it over makes XAML fail later with RO_E_CLOSED.
+    /// </remarks>
+    /// <param name="frame">The frame to show, or <see langword="null"/> to hide the thumbnail.</param>
+    private void ShowPreviewFrame(SeekPreviewFrame? frame)
+    {
+        if (frame is null)
+        {
+            HidePreviewThumbnail();
+            return;
+        }
+
+        try
+        {
+            if (_previewThumbnailBitmap is null
+                || _previewThumbnailBitmap.PixelWidth != frame.Width
+                || _previewThumbnailBitmap.PixelHeight != frame.Height)
+            {
+                _previewThumbnailBitmap = new WriteableBitmap(frame.Width, frame.Height);
+                _previewThumbnailBrush.ImageSource = _previewThumbnailBitmap;
+            }
+
+            frame.Pixels.CopyTo(_previewThumbnailBitmap.PixelBuffer);
+            _previewThumbnailBitmap.Invalidate();
+        }
+        catch (Exception)
+        {
+            // A missing thumbnail must never interrupt playback, so fall back to showing only the time.
+            HidePreviewThumbnail();
+            return;
+        }
+
+        double aspectRatio = (double)frame.Width / frame.Height;
+        double thumbnailWidth = Math.Min(PreviewThumbnailMaxWidth, PreviewThumbnailMaxHeight * aspectRatio);
+        _previewThumbnail.Width = thumbnailWidth;
+        _previewThumbnail.Height = thumbnailWidth / aspectRatio;
+        _previewThumbnail.Visibility = Visibility.Visible;
+        _previewToolTip.Padding = ThumbnailPreviewPadding;
+    }
+
+    /// <summary>
+    /// Collapses the preview thumbnail so that the preview shows only the time.
+    /// </summary>
+    private void HidePreviewThumbnail()
+    {
+        _previewThumbnail.Visibility = Visibility.Collapsed;
+        _previewToolTip.Padding = TimePreviewPadding;
     }
 }

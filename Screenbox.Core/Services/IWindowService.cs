@@ -12,6 +12,13 @@ public interface IWindowService
     public Task<bool> TryExitCompactLayoutAsync();
     public Task<bool> TryEnterCompactLayoutAsync(Size viewSize);
     Size GetMaxWindowSize();
+
+    /// <summary>
+    /// Gets the largest compact overlay ("picture in picture") window that the system allows.
+    /// </summary>
+    /// <returns>The maximum size, in effective pixels.</returns>
+    Size GetMaxCompactOverlaySize();
+
     double ResizeWindow(Size desiredSize, double scalar = 1);
     void HideCursor();
     void ShowCursor();
