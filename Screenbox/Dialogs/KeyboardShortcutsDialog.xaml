@@ -11,6 +11,15 @@
     Style="{StaticResource DefaultContentDialogStyle}"
     mc:Ignorable="d">
 
-    <!--  The rows are added in code, from the list of shortcuts in KeyboardShortcutsDialog.xaml.cs  -->
-    <StackPanel x:Name="ShortcutsPanel" Spacing="6" />
+    <!--
+        The dialog style does not scroll its content, and the list is much taller than the dialog,
+        so the list brings its own scroll viewer. The rows are added in code, in KeyboardShortcutsDialog.xaml.cs.
+    -->
+    <ScrollViewer
+        x:Name="ShortcutsScrollViewer"
+        Padding="0,0,16,0"
+        HorizontalScrollBarVisibility="Disabled"
+        VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="ShortcutsPanel" Spacing="6" />
+    </ScrollViewer>
 </ContentDialog>

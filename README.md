@@ -2,40 +2,127 @@
   <img width="128" align="center" src="Screenbox/Assets/StoreLogo.scale-400.png">
 </p>
 <h1 align="center">
-  Screenbox
+  Screenbox, VLC edition
 </h1>
 <p align="center">
-  The modern media player for Windows
+  The modern Windows media player, with the keyboard, volume and subtitle habits of VLC
 </p>
 <p align="center">
+  <a href="https://github.com/ganpatig/Screenbox/releases/latest"><b>⬇ Download the latest release</b></a>
+  &nbsp;·&nbsp;
+  <a href="#install">How to install</a>
+  &nbsp;·&nbsp;
+  <a href="#whats-different-from-the-original">What's different</a>
+</p>
+
+> [!NOTE]
+> This is a fork of [Screenbox](https://github.com/huynhsontung/Screenbox) by Tung H. Screenbox is a clean, fast, modern player; this fork keeps all of that and adds the things VLC users miss when they switch. The Microsoft Store version of Screenbox is the original app, not this fork.
+
+![The player, paused on a scene from Sintel](assets/images/fork/player.jpg)
+
+## Why use this fork
+
+- **Your VLC muscle memory works.** `Space`, `+` `-` `=` for speed, `Shift`/`Alt`/`Ctrl` + arrows for 3 s / 10 s / 1 min jumps, `E` for the next frame, `V` and `B` for subtitle and audio tracks, `G` `H` `J` `K` for delays, and dozens more, all the same as VLC 3.0.
+- **Any key can be changed.** A built-in shortcut editor lets you reassign every action and warns you before a key is taken from another one.
+- **You see where you are seeking.** The seek bar shows the actual frame under the pointer, not just a time.
+- **Subtitles in two clicks.** Search OpenSubtitles from inside the player; no browser, no unzipping.
+- **It remembers.** Each video reopens with the audio and subtitle tracks you picked, and new videos start in English when they have an English track.
+- **Loud when you need it.** Volume goes to 200% out of the box.
+
+## What's different from the original
+
+| | Original Screenbox | This fork |
+|---|---|---|
+| Keyboard shortcuts | YouTube-style (`J` `L` seek, `K` play, `+` `-` volume) | VLC 3.0 layout, about 90 shortcuts |
+| Change shortcuts | No | Yes, every shortcut, with conflict warnings |
+| Seek bar preview | Time only | Thumbnail of the exact frame |
+| Playback speed keys | `Shift+.` `Shift+,` (0.25× steps) | VLC's `+` `-` `=` `[` `]`, and the original two |
+| Maximum volume | 100% (200% if you turn on volume boost) | 200% by default |
+| Rewind and fast forward step | 5 seconds | 10 seconds, plus 3 s, 1 min and 5 min jumps |
+| Online subtitles | No | Search and load from OpenSubtitles |
+| Audio and subtitle track memory | Last subtitle language only | Audio and subtitle track per video, English audio preferred |
+| Picture-in-picture size | Opens small, size not remembered | As large as Windows allows, remembers your size |
+| Go to a time | No | `Ctrl+T` |
+| Settings from the player | No | In the player's ⋯ menu |
+| Delay, subtitle sync, crop, zoom, deinterlace keys | No (frame step and chapter keys only) | All of them, as in VLC |
+
+Everything else, from the library and playlists to casting and the Fluent design, is the original app.
+
+## The features
+
+### Frame-accurate seek previews
+
+Hover over the seek bar to see the frame at that point. While you move, the nearest keyframe follows the pointer so the preview keeps up; when you stop, the exact frame replaces it.
+
+![Seek bar preview showing the frame at 0:14 while the video is paused at 0:37](assets/images/fork/seek-preview.jpg)
+
+### VLC keyboard shortcuts, and you can change any of them
+
+Press `F1` in the player, or open **Settings › Player › Keyboard shortcuts › Customize**, to see every shortcut.
+
+![The keyboard shortcuts list](assets/images/fork/shortcuts.jpg)
+
+Select **Change**, press the new key, then **Set** to replace the keys or **Add** to keep the old ones too. If the key already belongs to another action, you're told before anything changes.
+
+![Changing the key for Next audio track; M is already used for Mute, and the editor says so](assets/images/fork/remap.jpg)
+
+### Playback speed and 200% volume
+
+`+` and `-` step through VLC's speeds (1.5×, 2×, 3×…), `=` goes back to normal, and `[` `]` adjust by 0.1×. The current speed appears in the corner. Volume goes up to 200%.
+
+![The 2× speed indicator after pressing + twice, with the volume at 200](assets/images/fork/speed.jpg)
+
+### Online subtitles
+
+Open **Audio & captions › Add subtitle from online**. The search is filled in from the file name; pick a language, pick a result, and select **Download**. The subtitle is added to the video that's playing.
+
+![Online subtitle search with results from OpenSubtitles](assets/images/fork/online-subtitles.jpg)
+
+### Settings from the player, and more
+
+The player's ⋯ menu now has **Settings**, and it shows the shortcut for each item.
+
+![The player menu with the new Settings item](assets/images/fork/menu.jpg)
+
+Also in this fork:
+
+- **Remembered tracks.** Change the audio or subtitle track of a video and it's selected again the next time you play that video.
+- **Bigger picture-in-picture.** Picture-in-picture (`Ctrl+M`) opens as large as Windows allows, which is 500 by 500 effective pixels and at most half the screen. Drag it to the size you like and it reopens at that size.
+- **Go to time.** `Ctrl+T` asks for a time and jumps there.
+- **Hold `Space`** to play at double speed for as long as you hold it.
+- **Fixes** for crashes when opening a video from the Recent list, and a crash log in the app's temporary folder for any that remain.
+
+New text in this fork is in English only; other languages show it in English until it is translated.
+
+<sub>Screenshots show the trailer of [Sintel](https://durian.blender.org/), © copyright Blender Foundation, licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).</sub>
+
+## Install
+
+1. Download `Screenbox-VLC-Edition-<version>-x64.zip` from the [latest release](https://github.com/ganpatig/Screenbox/releases/latest) and extract it.
+2. Right-click `Install-Screenbox.ps1` and select **Run with PowerShell**. Accept the administrator prompt.
+
+The script trusts the certificate the app is signed with (`Screenbox.cer`, in **Local Machine › Trusted People**), installs the two Microsoft packages it needs if they're missing, and installs Screenbox. Updating works the same way and keeps your settings and library.
+
+> [!IMPORTANT]
+> The app is signed with a self-signed certificate rather than one from a certificate authority, so Windows needs to be told to trust it, which is the step that needs administrator rights. The certificate is only for code signing. If you'd rather not trust it, build the app yourself as described under [Quick Start for Developers](#quick-start-for-developers).
+
+To uninstall, open **Settings › Apps › Installed apps**, find **Screenbox**, and select **Uninstall**.
+
+Requirements: Windows 10 version 1903 or later, or Windows 11, on an x64 PC.
+
+## About Screenbox
+
+<p>
   <a href='https://apps.microsoft.com/detail/9NTSNMSVCB5L?cid=storebadge&mode=mini'>
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://get.microsoft.com/images/en-us%20light.svg">
       <source media="(prefers-color-scheme: light)" srcset="https://get.microsoft.com/images/en-us%20dark.svg">
-      <img alt="Store link" src="https://get.microsoft.com/images/en-us%20dark.svg" height="50px">
+      <img alt="Get the original Screenbox from the Microsoft Store" src="https://get.microsoft.com/images/en-us%20dark.svg" height="50px">
     </picture>
   </a>
 </p>
 
-> [!NOTE]
-> **This is a fork** of [Screenbox](https://github.com/huynhsontung/Screenbox) by Tung H. that makes the player behave more like VLC. The Store link above installs the original app, not this fork.
-
-## What this fork adds
-
-- **VLC keyboard shortcuts.** The VLC 3.0 hotkey set: speed (`+` faster, `-` slower, `=` normal, `[` `]` fine steps), jumps of 3 s, 10 s, 1 min and 5 min, frame stepping, audio and subtitle delay, subtitle sync, aspect ratio, crop, zoom, deinterlace and more. Press `F1` in the player, or open Settings › Player › Keyboard shortcuts, to see them all and **reassign any key**.
-- **200% volume**, as in VLC, and 10-second rewind and fast-forward steps by default.
-- **Frame-accurate seek bar previews.** While you drag, the nearest keyframe follows the pointer; when you stop, the exact frame at that position replaces it.
-- **Online subtitles.** Search OpenSubtitles from the audio and subtitle menu and add a subtitle without leaving the player, in the spirit of VLC's VLSub.
-- **Remembered tracks.** Each video reopens with the audio and subtitle tracks you last chose for it. A video you have not played before starts with English audio when it has an English track.
-- **Bigger picture-in-picture.** Picture-in-picture opens as large as Windows allows and remembers the size you drag it to.
-- **Go to time** (`Ctrl+T`) and **Settings** in the player's ⋯ menu.
-- **Fixes** for crashes when opening a video from the Recent list, caused by the volume and chapter bars resizing in a loop.
-
-New text in this fork is in English only; other languages show it in English until it is translated.
-
-To use this fork, build it from source as described under [Quick Start for Developers](#quick-start-for-developers).
-
-## About Screenbox
+The badge above installs the original Screenbox from the Microsoft Store.
 
 Screenbox is a modern video player that cares about performance and ease of use on a wide range of device types. It features a beautiful, friendly user interface that is fast and lightweight. Screenbox is available on Windows 10 version 1903 and up, Windows 11, and Xbox consoles.
 
@@ -62,9 +149,9 @@ Some notable features:
 
 And many more on the way!
 
-## Install
+### Installing the original Screenbox
 
-The recommended way to install Screenbox is through the [Microsoft Store](https://www.microsoft.com/store/apps/9NTSNMSVCB5L). Installing through the store ensures the app stays up to date automatically. You don't need a Microsoft account to download apps from the store. The app can also be installed through winget using the following command.
+The recommended way to install the original Screenbox is through the [Microsoft Store](https://www.microsoft.com/store/apps/9NTSNMSVCB5L). Installing through the store ensures the app stays up to date automatically. You don't need a Microsoft account to download apps from the store. The app can also be installed through winget using the following command.
 
 ```shell
 winget install screenbox -s winget
